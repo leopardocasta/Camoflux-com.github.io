@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, initial-scale=1">
+<title>Camoflux: Incendio Igapó — Camoflux</title>
+<meta name="description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="images/favicon-180.png">
+<meta property="og:title" content="Camoflux: Incendio Igapó — Camoflux">
+<meta property="og:description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<meta property="og:image" content="images/og.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Camoflux: Incendio Igapó — Camoflux">
+<meta name="twitter:description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<meta name="twitter:image" content="images/og.jpg">
+<link rel="preload" as="image" href="images/cavern.jpg" fetchpriority="high">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{background:#0a0b0d;color:#e8e6df;font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{min-width:1280px;overflow-x:hidden}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.serif-italic{font-family:Georgia,serif;font-style:italic}
+.corner{position:absolute;width:14px;height:14px;pointer-events:none}
+.accent{color:#d8ff3a}
+.section-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.45)}
+a{color:inherit;text-decoration:none}
+em{font-family:Georgia,serif;font-style:italic;font-weight:400}
+strong{font-weight:500}
+
+.btn-primary{background:#d8ff3a;color:#0a0b0d;padding:13px 24px;font-size:12px;letter-spacing:0.08em;font-weight:500;display:inline-flex;align-items:center;gap:10px;cursor:pointer;border:none;transition:transform 0.2s ease, box-shadow 0.2s ease;font-family:'Inter',sans-serif}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 24px -8px rgba(216,255,58,0.35)}
+.btn-secondary{border:0.5px solid rgba(232,230,223,0.5);background:rgba(232,230,223,0.06);padding:13px 24px;font-size:12px;letter-spacing:0.08em;display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:#e8e6df;transition:background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, transform 0.2s ease;font-family:'Inter',sans-serif}
+.btn-secondary:hover{background:#e8e6df;color:#0a0b0d;border-color:#e8e6df;transform:translateY(-2px);box-shadow:0 0 32px rgba(232,230,223,0.45), 0 0 64px rgba(232,230,223,0.2)}
+.btn-secondary:hover .play-arrow{border-left-color:#0a0b0d}
+.play-arrow{transition:border-left-color 0.25s ease}
+
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
+.rec-dot{display:inline-block;animation:pulse-dot 1.6s ease-in-out infinite}
+@keyframes pulse-status{0%,100%{opacity:1}50%{opacity:0.5}}
+.status-live{animation:pulse-status 2s ease-in-out infinite}
+@keyframes ken-burns{0%{transform:scale(1.0) translate(0,0)}50%{transform:scale(1.08) translate(-1%,-1%)}100%{transform:scale(1.0) translate(0,0)}}
+.hero-bg{position:absolute;inset:-2%;animation:ken-burns 24s ease-in-out infinite;will-change:transform}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.marquee{display:flex;gap:48px;animation:marquee 40s linear infinite;width:max-content}
+.marquee-wrap{overflow:hidden;mask:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+
+.reveal{opacity:0;transform:translateY(24px);transition:opacity 0.9s cubic-bezier(0.2,0.6,0.2,1), transform 0.9s cubic-bezier(0.2,0.6,0.2,1)}
+.reveal.in{opacity:1;transform:translateY(0)}
+
+nav .nav-link{position:relative;cursor:pointer;transition:color 0.2s ease}
+nav .nav-link:hover{color:#e8e6df}
+nav .nav-link::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1px;background:#d8ff3a;transition:width 0.3s ease}
+nav .nav-link:hover::after{width:100%}
+nav .nav-link.active{color:#e8e6df}
+nav .nav-link.active::after{width:100%}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important}
+  .hero-bg{animation:none}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<header style="position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;padding:18px 48px;border-bottom:0.5px solid rgba(232,230,223,0.12);background:rgba(10,11,13,0.85);backdrop-filter:blur(12px);" class="mono">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="rec-dot" style="width:7px;height:7px;background:#d8ff3a;border-radius:50%;"></div>
+      <a href="index.html" style="letter-spacing:0.05em;font-weight:500;font-size:11px;">CAMOFLUX <span style="color:rgba(232,230,223,0.45);">/ LEVELS & BOSSES</span></a>
+    </div>
+    <div style="color:rgba(232,230,223,0.4);font-size:10px;letter-spacing:0.18em;">[ PART ONE ]</div>
+  </div>
+  <nav style="display:flex;gap:28px;color:rgba(232,230,223,0.65);letter-spacing:0.08em;font-size:11px;">
+    <a href="#world" class="nav-link active"><span>WORLD</span></a><a href="#features" class="nav-link "><span>FEATURES</span></a><a href="#press" class="nav-link "><span>PRESS</span></a><a href="#studio" class="nav-link "><span>STUDIO</span></a><a href="merch.html" class="nav-link "><span>MERCH</span></a><a href="devlog.html" class="nav-link "><span>DEVLOG</span></a>
+  </nav>
+  <a href="https://store.steampowered.com/app/897980/Camoflux_Levels__Bosses/" target="_blank" class="btn-primary" style="padding:8px 18px;font-size:11px;">WISHLIST →</a>
+</header>
+
+<section style="position:relative;height:520px;overflow:hidden;">
+  <div class="hero-bg" style="background:url(images/cavern.jpg) center/cover no-repeat;"></div>
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,11,13,0.55) 0%,rgba(10,11,13,0.25) 30%,rgba(10,11,13,0.5) 70%,rgba(10,11,13,0.95) 100%);"></div>
+  <div style="position:absolute;top:32px;left:48px;right:48px;display:flex;justify-content:space-between;font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.65);" class="mono">
+    <div>[ EXHIBITION // WHITNEY BIENNIAL 2026 ]</div>
+    <div class="accent status-live">● ON VIEW</div>
+  </div>
+  <div class="corner" style="top:24px;left:40px;border-left:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
+  <div class="corner" style="top:24px;right:40px;border-right:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
+  <div class="corner" style="bottom:24px;left:40px;border-left:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
+  <div class="corner" style="bottom:24px;right:40px;border-right:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
+  <div style="position:absolute;bottom:64px;left:48px;right:48px;">
+    <div class="mono reveal" style="font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.7);margin-bottom:18px;">Whitney Biennial 2026 · MARCH 8 — AUGUST 23, 2026</div>
+    <h1 class="reveal" style="font-size:80px;line-height:0.95;letter-spacing:-0.04em;font-weight:500;max-width:1000px;transition-delay:0.1s;">Camoflux: Incendio Igapó</h1>
+  </div>
+</section>
+
+<section style="padding:18px 48px;background:#14171a;display:grid;grid-template-columns:repeat(4,1fr);gap:32px;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.65);border-bottom:0.5px solid rgba(232,230,223,0.08);" class="mono">
+  <div><span class="accent">VENUE</span><br/><span style="color:#e8e6df;font-size:11px;letter-spacing:0.05em;">Whitney Museum of American Art</span></div>
+  <div><span class="accent">FLOOR</span><br/><span style="color:#e8e6df;font-size:11px;letter-spacing:0.05em;">Floor 6</span></div>
+  <div><span class="accent">CURATORS</span><br/><span style="color:#e8e6df;font-size:11px;letter-spacing:0.05em;">Marcela Guerrero & Drew Sawyer</span></div>
+  <div><span class="accent">DATES</span><br/><span style="color:#e8e6df;font-size:11px;letter-spacing:0.05em;">March 8 — August 23, 2026</span></div>
+</section>
+
+<section style="padding:96px 48px;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
+    <div class="section-label reveal" style="padding-top:14px;">[ ABOUT ]</div>
+    <p class="reveal" style="font-size:21px;line-height:1.55;color:rgba(232,230,223,0.85);max-width:760px;font-weight:400;letter-spacing:-0.01em;transition-delay:0.1s;">A playable installation. Fiberglass furniture, vinyl, custom controllers, ultra-high-definition video game. Camoflux: Incendio Igapó is presented alongside a 360° in-game video capture and the artport commission Camoflux: Recall Grotto.</p>
+  </div>
+</section>
+
+<section style="padding:0 48px 96px;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:48px;">
+    <div class="section-label reveal" style="padding-top:14px;">[ WORKS ON VIEW ]</div>
+    <div class="mono reveal" style="font-size:11px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">03 INSTALLATIONS</div>
+  </div>
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
+    <div></div>
+    <div>
+      
+    <article class="reveal" style="display:grid;grid-template-columns:1fr 1.2fr;gap:48px;align-items:center;margin-bottom:96px;">
+      <div style="">
+        <div class="mono accent" style="font-size:10px;letter-spacing:0.22em;margin-bottom:14px;">WORK_01</div>
+        <h3 style="font-size:32px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:8px;">Camoflux: Levels & Bosses — Incendio Igapó</h3>
+        <div class="mono" style="font-size:11px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);margin-bottom:18px;">2023–26 · Ultra-high-definition video game · fiberglass furniture · vinyl</div>
+        <p style="font-size:15px;color:rgba(232,230,223,0.72);line-height:1.65;">The central installation. A playable chapter of Camoflux presented as spatial encounter. Visitors take turns at the controllers; the rest watch.</p>
+      </div>
+      <div style="aspect-ratio:4/3;background:url(images/cavern.jpg) center/cover no-repeat;position:relative;">
+        <div class="mono" style="position:absolute;bottom:14px;left:14px;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.7);background:rgba(10,11,13,0.5);padding:6px 10px;">CAMOFLUX: LEVELS & BOSSES — INCENDIO IGA</div>
+      </div>
+    </article>
+    <article class="reveal" style="display:grid;grid-template-columns:1.2fr 1fr;gap:48px;align-items:center;margin-bottom:96px;">
+      <div style="order:2;">
+        <div class="mono accent" style="font-size:10px;letter-spacing:0.22em;margin-bottom:14px;">WORK_02</div>
+        <h3 style="font-size:32px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:8px;">Camoflux Incendio Igapó 360</h3>
+        <div class="mono" style="font-size:11px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);margin-bottom:18px;">2026 · 8K 360° video · custom software · 8:10</div>
+        <p style="font-size:15px;color:rgba(232,230,223,0.72);line-height:1.65;">An in-game video capture rendered at full resolution. Adjacent to the playable work, it stages the same spatial material under different terms — the camera logic of world-recording.</p>
+      </div>
+      <div style="aspect-ratio:4/3;background:url(images/mangrove.jpg) center/cover no-repeat;position:relative;order:1;">
+        <div class="mono" style="position:absolute;bottom:14px;left:14px;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.7);background:rgba(10,11,13,0.5);padding:6px 10px;">CAMOFLUX INCENDIO IGAPÓ 360</div>
+      </div>
+    </article>
+    <article class="reveal" style="display:grid;grid-template-columns:1fr 1.2fr;gap:48px;align-items:center;margin-bottom:96px;">
+      <div style="">
+        <div class="mono accent" style="font-size:10px;letter-spacing:0.22em;margin-bottom:14px;">WORK_03</div>
+        <h3 style="font-size:32px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:8px;">Camoflux Recall Grotto</h3>
+        <div class="mono" style="font-size:11px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);margin-bottom:18px;">2025–26 · Browser-based game · commissioned for artport · acquired into Whitney collection</div>
+        <p style="font-size:15px;color:rgba(232,230,223,0.72);line-height:1.65;">A separate, browser-playable work. As an organic drone, gather water and sunlight to cultivate cyberflora across a primordial landscape. Holographic memories surface from the blooming vegetation.</p>
+      </div>
+      <div style="aspect-ratio:4/3;background:url(images/igapo.jpg) center/cover no-repeat;position:relative;">
+        <div class="mono" style="position:absolute;bottom:14px;left:14px;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.7);background:rgba(10,11,13,0.5);padding:6px 10px;">CAMOFLUX RECALL GROTTO</div>
+      </div>
+    </article>
+    </div>
+  </div>
+</section>
+
+<section style="padding:96px 48px;background:#14171a;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;align-items:center;">
+    <div class="section-label reveal">[ PRESS ]</div>
+    <div>
+      <blockquote class="reveal" style="margin:0;">
+        <p class="serif-italic" style="font-size:32px;letter-spacing:-0.02em;line-height:1.35;margin-bottom:28px;">"What the museum is now hosting, directly and with apparent conviction, is play itself."</p>
+        <footer style="display:flex;justify-content:space-between;align-items:center;padding-top:20px;border-top:0.5px solid rgba(232,230,223,0.15);" class="mono">
+          <cite style="font-size:11px;letter-spacing:0.12em;font-style:normal;">GAMESCENES · MATTEO BITTANTI</cite>
+          <a href="https://www.gamescenes.org/play-itself-or-leo-castaneda-at-the-whitney-biennial-2026/" target="_blank" class="accent" style="font-size:11px;letter-spacing:0.12em;">READ FULL ARTICLE →</a>
+        </footer>
+      </blockquote>
+    </div>
+  </div>
+</section>
+
+<section style="padding:96px 48px;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
+    <div class="section-label reveal" style="padding-top:14px;">[ VISIT ]</div>
+    <div style="max-width:760px;">
+      <h2 class="reveal" style="font-size:38px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:32px;">Plan your visit.</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:32px;">
+        <div class="reveal">
+          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">ADDRESS</div>
+          <div style="font-size:15px;line-height:1.6;color:rgba(232,230,223,0.85);">Whitney Museum of American Art<br/>99 Gansevoort Street, New York, NY 10014</div>
+        </div>
+        <div class="reveal" style="transition-delay:0.05s;">
+          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">HOURS</div>
+          <div style="font-size:15px;line-height:1.6;color:rgba(232,230,223,0.85);">Wed–Mon, 10:30 am – 6 pm · Tue closed</div>
+        </div>
+        <div class="reveal">
+          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">ADMISSION</div>
+          <div style="font-size:15px;line-height:1.6;color:rgba(232,230,223,0.85);">$30 adults · $24 visitors 65+ · Free under 18</div>
+        </div>
+        <div class="reveal" style="transition-delay:0.05s;">
+          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">DATES</div>
+          <div style="font-size:15px;line-height:1.6;color:rgba(232,230,223,0.85);">March 8 — August 23, 2026</div>
+        </div>
+      </div>
+      <a href="https://whitney.org/exhibitions/2026-biennial" target="_blank" class="btn-primary">VISIT WHITNEY.ORG →</a>
+    </div>
+  </div>
+</section>
+
+<footer style="padding:48px;background:#0a0b0d;border-top:0.5px solid rgba(232,230,223,0.1);display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:36px;" class="mono">
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <div class="rec-dot" style="width:6px;height:6px;background:#d8ff3a;border-radius:50%;"></div>
+      <div style="font-size:12px;font-weight:500;letter-spacing:0.05em;">CAMOFLUX <span style="color:rgba(232,230,223,0.4);">/ LEVELS & BOSSES</span></div>
+    </div>
+    <div style="color:rgba(232,230,223,0.45);font-size:10px;line-height:1.7;letter-spacing:0.05em;">© LEVELS & BOSSES · OTRO INVENTARIO<br/>NEWSLETTER SIGNUP →</div>
+  </div>
+  <div>
+    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ PLAY ]</div>
+    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;">
+      <a href="https://store.steampowered.com/app/897980/Camoflux_Levels__Bosses/" target="_blank">STEAM</a><br/>
+      <a href="presskit.html">PRESS KIT</a><br/>
+      <a href="exhibition.html">EXHIBITION</a>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ FOLLOW ]</div>
+    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;">
+      <a href="https://www.youtube.com/@levelsandbosses" target="_blank">YOUTUBE</a><br/>
+      <a href="https://www.instagram.com/levelsandbosses/" target="_blank">INSTAGRAM</a><br/>
+      <a href="https://x.com/LevelsandBosses" target="_blank">X / THREADS</a><br/>
+      <a href="https://www.tiktok.com/@levelsandbosses" target="_blank">TIKTOK</a>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ CONTACT ]</div>
+    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;"><a href="mailto:press@levelsandbosses.com">PRESS@LEVELSANDBOSSES.COM</a></div>
+  </div>
+</footer>
+<script>
+const reveals = document.querySelectorAll('.reveal');
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
+reveals.forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>

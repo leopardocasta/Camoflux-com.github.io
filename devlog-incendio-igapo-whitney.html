@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, initial-scale=1">
+<title>Notes from the install: Incendio Igapó at the Whitney — Devlog</title>
+<meta name="description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="images/favicon-180.png">
+<meta property="og:title" content="Notes from the install: Incendio Igapó at the Whitney — Devlog">
+<meta property="og:description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<meta property="og:image" content="images/og.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Notes from the install: Incendio Igapó at the Whitney — Devlog">
+<meta name="twitter:description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<meta name="twitter:image" content="images/og.jpg">
+<link rel="preload" as="image" href="images/cavern.jpg" fetchpriority="high">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{background:#0a0b0d;color:#e8e6df;font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{min-width:1280px;overflow-x:hidden}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.serif-italic{font-family:Georgia,serif;font-style:italic}
+.corner{position:absolute;width:14px;height:14px;pointer-events:none}
+.accent{color:#d8ff3a}
+.section-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.45)}
+a{color:inherit;text-decoration:none}
+em{font-family:Georgia,serif;font-style:italic;font-weight:400}
+strong{font-weight:500}
+
+.btn-primary{background:#d8ff3a;color:#0a0b0d;padding:13px 24px;font-size:12px;letter-spacing:0.08em;font-weight:500;display:inline-flex;align-items:center;gap:10px;cursor:pointer;border:none;transition:transform 0.2s ease, box-shadow 0.2s ease;font-family:'Inter',sans-serif}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 24px -8px rgba(216,255,58,0.35)}
+.btn-secondary{border:0.5px solid rgba(232,230,223,0.5);background:rgba(232,230,223,0.06);padding:13px 24px;font-size:12px;letter-spacing:0.08em;display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:#e8e6df;transition:background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, transform 0.2s ease;font-family:'Inter',sans-serif}
+.btn-secondary:hover{background:#e8e6df;color:#0a0b0d;border-color:#e8e6df;transform:translateY(-2px);box-shadow:0 0 32px rgba(232,230,223,0.45), 0 0 64px rgba(232,230,223,0.2)}
+.btn-secondary:hover .play-arrow{border-left-color:#0a0b0d}
+.play-arrow{transition:border-left-color 0.25s ease}
+
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
+.rec-dot{display:inline-block;animation:pulse-dot 1.6s ease-in-out infinite}
+@keyframes pulse-status{0%,100%{opacity:1}50%{opacity:0.5}}
+.status-live{animation:pulse-status 2s ease-in-out infinite}
+@keyframes ken-burns{0%{transform:scale(1.0) translate(0,0)}50%{transform:scale(1.08) translate(-1%,-1%)}100%{transform:scale(1.0) translate(0,0)}}
+.hero-bg{position:absolute;inset:-2%;animation:ken-burns 24s ease-in-out infinite;will-change:transform}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.marquee{display:flex;gap:48px;animation:marquee 40s linear infinite;width:max-content}
+.marquee-wrap{overflow:hidden;mask:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+
+.reveal{opacity:0;transform:translateY(24px);transition:opacity 0.9s cubic-bezier(0.2,0.6,0.2,1), transform 0.9s cubic-bezier(0.2,0.6,0.2,1)}
+.reveal.in{opacity:1;transform:translateY(0)}
+
+nav .nav-link{position:relative;cursor:pointer;transition:color 0.2s ease}
+nav .nav-link:hover{color:#e8e6df}
+nav .nav-link::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1px;background:#d8ff3a;transition:width 0.3s ease}
+nav .nav-link:hover::after{width:100%}
+nav .nav-link.active{color:#e8e6df}
+nav .nav-link.active::after{width:100%}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important}
+  .hero-bg{animation:none}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<header style="position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;padding:18px 48px;border-bottom:0.5px solid rgba(232,230,223,0.12);background:rgba(10,11,13,0.85);backdrop-filter:blur(12px);" class="mono">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="rec-dot" style="width:7px;height:7px;background:#d8ff3a;border-radius:50%;"></div>
+      <a href="index.html" style="letter-spacing:0.05em;font-weight:500;font-size:11px;">CAMOFLUX <span style="color:rgba(232,230,223,0.45);">/ LEVELS & BOSSES</span></a>
+    </div>
+    <div style="color:rgba(232,230,223,0.4);font-size:10px;letter-spacing:0.18em;">[ PART ONE ]</div>
+  </div>
+  <nav style="display:flex;gap:28px;color:rgba(232,230,223,0.65);letter-spacing:0.08em;font-size:11px;">
+    <a href="#world" class="nav-link "><span>WORLD</span></a><a href="#features" class="nav-link "><span>FEATURES</span></a><a href="#press" class="nav-link "><span>PRESS</span></a><a href="#studio" class="nav-link "><span>STUDIO</span></a><a href="merch.html" class="nav-link "><span>MERCH</span></a><a href="devlog.html" class="nav-link active"><span>DEVLOG</span></a>
+  </nav>
+  <a href="https://store.steampowered.com/app/897980/Camoflux_Levels__Bosses/" target="_blank" class="btn-primary" style="padding:8px 18px;font-size:11px;">WISHLIST →</a>
+</header>
+
+<section style="padding:80px 48px 48px;">
+  <div class="mono reveal" style="display:flex;gap:24px;font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:24px;">
+    <span><a href="devlog.html" class="accent">← DEVLOG</a></span>
+    <span>2026.04.12</span>
+    <span class="accent">EXHIBITION</span>
+  </div>
+  <h1 class="reveal" style="font-size:64px;line-height:1.0;letter-spacing:-0.035em;font-weight:500;margin-bottom:24px;max-width:1000px;transition-delay:0.1s;">Notes from the install: Incendio Igapó at the Whitney</h1>
+  <p class="reveal" style="font-size:18px;line-height:1.55;color:rgba(232,230,223,0.7);max-width:720px;font-style:italic;font-family:Georgia,serif;transition-delay:0.2s;">On staging a playable game inside a museum, fiberglass furniture as scenography, and the awkward beauty of strangers watching strangers play.</p>
+</section>
+
+
+<section style="padding:0 48px 48px;">
+  <div style="aspect-ratio:21/9;background:url(images/cavern.jpg) center/cover no-repeat;position:relative;">
+    <div class="mono" style="position:absolute;bottom:16px;left:16px;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.7);background:rgba(10,11,13,0.5);padding:6px 10px;">DEVLOG_INCENDIO-IGAPO-WHITNEY_HERO.JPG</div>
+  </div>
+</section>
+
+<article style="padding:48px 48px 96px;max-width:780px;margin:0 auto;">
+  <p style="font-size:17px;line-height:1.75;color:rgba(232,230,223,0.85);margin-bottom:24px;">Installing Camoflux at the Whitney has been an exercise in translation. A game is normally a private encounter — one player, one screen, one set of headphones. The Biennial install asks the work to become public: a screen on a wall, fiberglass seating arranged around it, a vinyl decal on the floor, and people who came for sculpture suddenly negotiating a controller.</p><p style="font-size:17px;line-height:1.75;color:rgba(232,230,223,0.85);margin-bottom:24px;">What surprised me most is how the seating choreographs attention. We tried three configurations before landing on the current one. When the chairs face the screen too directly, the room feels like a movie theater — wrong. When they're scattered, no one sits down. The current arc, slightly tilted inward, lets visitors observe each other observing the game. The work is partly about that triangulation.</p><p style="font-size:17px;line-height:1.75;color:rgba(232,230,223,0.85);margin-bottom:24px;">The fiberglass pieces are deliberately unfamiliar. Not gallery benches, not gaming chairs — something closer to organic furniture from a world that hasn't quite happened. They cue visitors that the rules of the room are different.</p><p style="font-size:17px;line-height:1.75;color:rgba(232,230,223,0.85);margin-bottom:24px;">We open March 8. If you're in New York between then and August 23, come by. The work is on Floor 6, near the Connolly piece. The controllers are on a 90-second cooldown so everyone gets a turn.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:64px;padding-top:48px;border-top:0.5px solid rgba(232,230,223,0.15);"><div></div><a href="devlog-butterfly-drone-collab.html" style="display:block;text-align:right;"><div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:8px;">OLDER →</div><div style="font-size:16px;letter-spacing:-0.01em;font-weight:500;">Butterfly drone collaboration with Maria Thereza Negreiros</div></a></div>
+</article>
+
+<footer style="padding:48px;background:#0a0b0d;border-top:0.5px solid rgba(232,230,223,0.1);display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:36px;" class="mono">
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <div class="rec-dot" style="width:6px;height:6px;background:#d8ff3a;border-radius:50%;"></div>
+      <div style="font-size:12px;font-weight:500;letter-spacing:0.05em;">CAMOFLUX <span style="color:rgba(232,230,223,0.4);">/ LEVELS & BOSSES</span></div>
+    </div>
+    <div style="color:rgba(232,230,223,0.45);font-size:10px;line-height:1.7;letter-spacing:0.05em;">© LEVELS & BOSSES · OTRO INVENTARIO<br/>NEWSLETTER SIGNUP →</div>
+  </div>
+  <div>
+    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ PLAY ]</div>
+    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;">
+      <a href="https://store.steampowered.com/app/897980/Camoflux_Levels__Bosses/" target="_blank">STEAM</a><br/>
+      <a href="presskit.html">PRESS KIT</a><br/>
+      <a href="exhibition.html">EXHIBITION</a>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ FOLLOW ]</div>
+    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;">
+      <a href="https://www.youtube.com/@levelsandbosses" target="_blank">YOUTUBE</a><br/>
+      <a href="https://www.instagram.com/levelsandbosses/" target="_blank">INSTAGRAM</a><br/>
+      <a href="https://x.com/LevelsandBosses" target="_blank">X / THREADS</a><br/>
+      <a href="https://www.tiktok.com/@levelsandbosses" target="_blank">TIKTOK</a>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ CONTACT ]</div>
+    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;"><a href="mailto:press@levelsandbosses.com">PRESS@LEVELSANDBOSSES.COM</a></div>
+  </div>
+</footer>
+<script>
+const reveals = document.querySelectorAll('.reveal');
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
+reveals.forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>

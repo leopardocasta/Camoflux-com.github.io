@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, initial-scale=1">
+<title>Press Kit — Camoflux</title>
+<meta name="description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="images/favicon-180.png">
+<meta property="og:title" content="Press Kit — Camoflux">
+<meta property="og:description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<meta property="og:image" content="images/og.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Press Kit — Camoflux">
+<meta name="twitter:description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<meta name="twitter:image" content="images/og.jpg">
+<link rel="preload" as="image" href="images/cavern.jpg" fetchpriority="high">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{background:#0a0b0d;color:#e8e6df;font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{min-width:1280px;overflow-x:hidden}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.serif-italic{font-family:Georgia,serif;font-style:italic}
+.corner{position:absolute;width:14px;height:14px;pointer-events:none}
+.accent{color:#d8ff3a}
+.section-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.45)}
+a{color:inherit;text-decoration:none}
+em{font-family:Georgia,serif;font-style:italic;font-weight:400}
+strong{font-weight:500}
+
+.btn-primary{background:#d8ff3a;color:#0a0b0d;padding:13px 24px;font-size:12px;letter-spacing:0.08em;font-weight:500;display:inline-flex;align-items:center;gap:10px;cursor:pointer;border:none;transition:transform 0.2s ease, box-shadow 0.2s ease;font-family:'Inter',sans-serif}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 24px -8px rgba(216,255,58,0.35)}
+.btn-secondary{border:0.5px solid rgba(232,230,223,0.5);background:rgba(232,230,223,0.06);padding:13px 24px;font-size:12px;letter-spacing:0.08em;display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:#e8e6df;transition:background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, transform 0.2s ease;font-family:'Inter',sans-serif}
+.btn-secondary:hover{background:#e8e6df;color:#0a0b0d;border-color:#e8e6df;transform:translateY(-2px);box-shadow:0 0 32px rgba(232,230,223,0.45), 0 0 64px rgba(232,230,223,0.2)}
+.btn-secondary:hover .play-arrow{border-left-color:#0a0b0d}
+.play-arrow{transition:border-left-color 0.25s ease}
+
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
+.rec-dot{display:inline-block;animation:pulse-dot 1.6s ease-in-out infinite}
+@keyframes pulse-status{0%,100%{opacity:1}50%{opacity:0.5}}
+.status-live{animation:pulse-status 2s ease-in-out infinite}
+@keyframes ken-burns{0%{transform:scale(1.0) translate(0,0)}50%{transform:scale(1.08) translate(-1%,-1%)}100%{transform:scale(1.0) translate(0,0)}}
+.hero-bg{position:absolute;inset:-2%;animation:ken-burns 24s ease-in-out infinite;will-change:transform}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.marquee{display:flex;gap:48px;animation:marquee 40s linear infinite;width:max-content}
+.marquee-wrap{overflow:hidden;mask:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+
+.reveal{opacity:0;transform:translateY(24px);transition:opacity 0.9s cubic-bezier(0.2,0.6,0.2,1), transform 0.9s cubic-bezier(0.2,0.6,0.2,1)}
+.reveal.in{opacity:1;transform:translateY(0)}
+
+nav .nav-link{position:relative;cursor:pointer;transition:color 0.2s ease}
+nav .nav-link:hover{color:#e8e6df}
+nav .nav-link::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1px;background:#d8ff3a;transition:width 0.3s ease}
+nav .nav-link:hover::after{width:100%}
+nav .nav-link.active{color:#e8e6df}
+nav .nav-link.active::after{width:100%}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important}
+  .hero-bg{animation:none}
+  .reveal{opacity:1;transform:none}
+}
+
+.dl-card{transition:border-color 0.2s ease, background 0.2s ease}
+.dl-card:hover{border-color:rgba(216,255,58,0.5);background:rgba(216,255,58,0.04)}
+.dl-card:hover .dl-arrow{color:#d8ff3a;transform:translateX(4px)}
+.dl-arrow{transition:transform 0.2s ease, color 0.2s ease}
+.shot{position:relative;overflow:hidden;cursor:pointer;aspect-ratio:16/9}
+.shot-img{position:absolute;inset:0;transition:transform 0.6s cubic-bezier(0.2,0.6,0.2,1)}
+.shot:hover .shot-img{transform:scale(1.04)}
+.shot-overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(10,11,13,0.85) 0%,transparent 50%);opacity:0;transition:opacity 0.3s ease;display:flex;flex-direction:column;justify-content:flex-end;padding:18px}
+.shot:hover .shot-overlay{opacity:1}
+.fact-row{display:grid;grid-template-columns:200px 1fr;gap:32px;padding:18px 0;border-bottom:0.5px solid rgba(232,230,223,0.1)}
+.fact-row:last-child{border-bottom:none}
+.fact-key{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.15em;color:rgba(232,230,223,0.5);padding-top:2px}
+.fact-val{font-size:15px;color:rgba(232,230,223,0.92);line-height:1.6}
+.tag{display:inline-block;padding:5px 11px;border:0.5px solid rgba(232,230,223,0.25);font-size:11px;letter-spacing:0.05em;color:rgba(232,230,223,0.75);margin:0 6px 6px 0;font-family:'JetBrains Mono',monospace}
+.press-quote{transition:background 0.3s ease, transform 0.3s ease}
+.press-quote:hover{background:#1a1d20;transform:translateY(-3px)}
+.press-quote:hover .press-meta{color:#d8ff3a}
+.press-meta{transition:color 0.25s ease}
+</style>
+</head>
+<body>
+<header style="position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;padding:18px 48px;border-bottom:0.5px solid rgba(232,230,223,0.12);background:rgba(10,11,13,0.85);backdrop-filter:blur(12px);" class="mono">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="rec-dot" style="width:7px;height:7px;background:#d8ff3a;border-radius:50%;"></div>
+      <a href="index.html" style="letter-spacing:0.05em;font-weight:500;font-size:11px;">CAMOFLUX <span style="color:rgba(232,230,223,0.45);">/ LEVELS & BOSSES</span></a>
+    </div>
+    <div style="color:rgba(232,230,223,0.4);font-size:10px;letter-spacing:0.18em;">[ PART ONE ]</div>
+  </div>
+  <nav style="display:flex;gap:28px;color:rgba(232,230,223,0.65);letter-spacing:0.08em;font-size:11px;">
+    <a href="#world" class="nav-link "><span>WORLD</span></a><a href="#features" class="nav-link "><span>FEATURES</span></a><a href="#press" class="nav-link active"><span>PRESS</span></a><a href="#studio" class="nav-link "><span>STUDIO</span></a><a href="merch.html" class="nav-link "><span>MERCH</span></a><a href="devlog.html" class="nav-link "><span>DEVLOG</span></a>
+  </nav>
+  <a href="https://store.steampowered.com/app/897980/Camoflux_Levels__Bosses/" target="_blank" class="btn-primary" style="padding:8px 18px;font-size:11px;">WISHLIST →</a>
+</header>
+
+<section style="padding:80px 48px 40px;border-bottom:0.5px solid rgba(232,230,223,0.1);">
+  <div class="mono reveal" style="font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.5);margin-bottom:18px;">[ PRESS KIT · v2026.04 ]</div>
+  <h1 class="reveal" style="font-size:88px;line-height:0.95;letter-spacing:-0.04em;font-weight:500;margin-bottom:28px;max-width:1100px;transition-delay:0.1s;">Materials for the press.</h1>
+  <p class="reveal" style="font-size:17px;line-height:1.6;color:rgba(232,230,223,0.7);max-width:680px;margin-bottom:36px;transition-delay:0.2s;">Logos, screenshots, key art, trailers, and a fact sheet for journalists, curators, and broadcasters covering Camoflux. All assets cleared for editorial use.</p>
+  <div class="reveal" style="display:flex;gap:14px;align-items:center;transition-delay:0.3s;">
+    <a href="#" class="btn-primary">DOWNLOAD ALL ASSETS<span style="font-size:10px;color:rgba(10,11,13,0.6);letter-spacing:0.1em;">.ZIP · 482 MB</span></a>
+    <a href="mailto:press@levelsandbosses.com" class="btn-secondary">PRESS ENQUIRIES →</a>
+  </div>
+</section>
+
+<section style="padding:14px 48px;background:#14171a;display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.55);border-bottom:0.5px solid rgba(232,230,223,0.08);" class="mono">
+  <div style="display:flex;gap:36px;">
+    <span>STATUS: <span class="accent">PRE-RELEASE</span></span>
+    <span>EPISODE 01 / IIII</span>
+    <span>UE5 · WIN/MAC/LINUX</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <span style="color:rgba(232,230,223,0.4);">SHIPPING</span>
+    <span>2026 Q3</span>
+  </div>
+</section>
+
+<section style="padding:120px 48px;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
+    <div><div class="section-label reveal">[ 01 / FACT SHEET ]</div></div>
+    <div class="reveal" style="max-width:880px;"><div class="fact-row"><div class="fact-key">TITLE</div><div class="fact-val">Camoflux: Levels & Bosses</div></div><div class="fact-row"><div class="fact-key">DEVELOPER</div><div class="fact-val">Levels & Bosses (Leo Castañeda)</div></div><div class="fact-row"><div class="fact-key">PUBLISHER</div><div class="fact-val">Otro Inventario</div></div><div class="fact-row"><div class="fact-key">RELEASE</div><div class="fact-val">2026 Q3 (Episode 01 of IIII)</div></div><div class="fact-row"><div class="fact-key">PLATFORMS</div><div class="fact-val">PC (Steam) — Windows, macOS, Linux</div></div><div class="fact-row"><div class="fact-key">PRICE</div><div class="fact-val">TBA</div></div><div class="fact-row"><div class="fact-key">ENGINE</div><div class="fact-val">Unreal Engine 5</div></div><div class="fact-row"><div class="fact-key">LANGUAGES</div><div class="fact-val">English, Spanish (interface)</div></div><div class="fact-row"><div class="fact-key">EXHIBITION</div><div class="fact-val">Whitney Biennial 2026 · March 8 — August 23, 2026</div></div><div class="fact-row"><div class="fact-key">PRESS CONTACT</div><div class="fact-val"><a href="mailto:press@levelsandbosses.com" class="accent">press@levelsandbosses.com</a></div></div><div class="fact-row"><div class="fact-key">GENRE</div><div class="fact-val"><span class="tag">Exploration</span><span class="tag">Adventure</span><span class="tag">Puzzle</span><span class="tag">Stealth</span><span class="tag">Atmospheric</span><span class="tag">Surreal</span><span class="tag">Philosophical</span></div></div></div>
+  </div>
+</section>
+
+<section style="padding:0 48px 120px;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
+    <div><div class="section-label reveal">[ 02 / DESCRIPTION ]</div></div>
+    <div style="max-width:760px;">
+      <div class="reveal">
+        <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:14px;">SHORT — 50 WORDS</div>
+        <p style="font-size:17px;line-height:1.7;color:rgba(232,230,223,0.85);margin-bottom:48px;">Camoflux is a hand-painted episodic exploration game where landscapes, bodies, and technology fuse. As <em>The Other</em>, channel circuits of environmental energy, camouflage into shifting terrains, and reshape a cyclical cataclysm — through play, not conquest.</p>
+      </div>
+      <div class="reveal" style="transition-delay:0.1s;">
+        <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:14px;">LONG — 150 WORDS</div>
+        <p style="font-size:15px;line-height:1.7;color:rgba(232,230,223,0.75);margin-bottom:18px;">Camoflux: Levels &amp; Bosses is a third-person exploration game built across four episodic chapters. You inhabit <em>The Other</em>, a being who adapts to changing environments through vibrational terraforming, camouflage, and electromagnetic sensors. Glide through interconnected hand-painted worlds where landscapes, bodies, and technology share sentience.</p><p style="font-size:15px;line-height:1.7;color:rgba(232,230,223,0.75);margin-bottom:18px;">A unique combat system lets you destroy bosses or dynamically engage with them — refusing the binary that defines most action games. Customize through camouflage. Switch embodiments. Solve surreal environmental puzzles in landscapes built from Romantic and Surrealist painting, VR sculpting, and Unreal Engine 5.</p><p style="font-size:15px;line-height:1.7;color:rgba(232,230,223,0.75);margin-bottom:18px;">Camoflux is currently exhibited at the 2026 Whitney Biennial as a playable installation. Steam release: 2026.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:120px 48px;background:#14171a;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:48px;">
+    <div><div class="section-label reveal">[ 03 / DOWNLOADS ]</div></div>
+    <h2 class="reveal" style="font-size:34px;letter-spacing:-0.025em;line-height:1.2;font-weight:400;">Asset packs.</h2>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+    <a href="#" class="dl-card reveal" style="display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding:26px 28px;border:0.5px solid rgba(232,230,223,0.18);background:rgba(10,11,13,0.4);">
+      <div class="mono accent" style="font-size:10px;letter-spacing:0.15em;width:48px;">.ZIP</div>
+      <div>
+        <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">Logos & Wordmarks</div>
+        <div class="mono" style="font-size:10px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">SVG · PNG · EPS · 12 FILES · 8.4 MB</div>
+      </div>
+      <div class="dl-arrow mono" style="font-size:14px;color:rgba(232,230,223,0.6);">→</div>
+    </a>
+    <a href="#" class="dl-card reveal" style="display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding:26px 28px;border:0.5px solid rgba(232,230,223,0.18);background:rgba(10,11,13,0.4);transition-delay:0.05s;">
+      <div class="mono accent" style="font-size:10px;letter-spacing:0.15em;width:48px;">.ZIP</div>
+      <div>
+        <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">Screenshots — 4K</div>
+        <div class="mono" style="font-size:10px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">PNG · 24 FILES · 184 MB</div>
+      </div>
+      <div class="dl-arrow mono" style="font-size:14px;color:rgba(232,230,223,0.6);">→</div>
+    </a>
+    <a href="#" class="dl-card reveal" style="display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding:26px 28px;border:0.5px solid rgba(232,230,223,0.18);background:rgba(10,11,13,0.4);">
+      <div class="mono accent" style="font-size:10px;letter-spacing:0.15em;width:48px;">.ZIP</div>
+      <div>
+        <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">Key Art & Posters</div>
+        <div class="mono" style="font-size:10px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">PNG · TIFF · PDF · 8 FILES · 96 MB</div>
+      </div>
+      <div class="dl-arrow mono" style="font-size:14px;color:rgba(232,230,223,0.6);">→</div>
+    </a>
+    <a href="#" class="dl-card reveal" style="display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding:26px 28px;border:0.5px solid rgba(232,230,223,0.18);background:rgba(10,11,13,0.4);transition-delay:0.05s;">
+      <div class="mono accent" style="font-size:10px;letter-spacing:0.15em;width:48px;">.ZIP</div>
+      <div>
+        <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">Animated GIFs</div>
+        <div class="mono" style="font-size:10px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">GIF · MP4 · 6 FILES · 42 MB</div>
+      </div>
+      <div class="dl-arrow mono" style="font-size:14px;color:rgba(232,230,223,0.6);">→</div>
+    </a>
+    <a href="#" class="dl-card reveal" style="display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding:26px 28px;border:0.5px solid rgba(232,230,223,0.18);background:rgba(10,11,13,0.4);">
+      <div class="mono accent" style="font-size:10px;letter-spacing:0.15em;width:48px;">.MP4</div>
+      <div>
+        <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">Trailer — 4K Master</div>
+        <div class="mono" style="font-size:10px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">MP4 · 4K · 02:14 · 148 MB</div>
+      </div>
+      <div class="dl-arrow mono" style="font-size:14px;color:rgba(232,230,223,0.6);">→</div>
+    </a>
+    <a href="#" class="dl-card reveal" style="display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding:26px 28px;border:0.5px solid rgba(232,230,223,0.18);background:rgba(10,11,13,0.4);transition-delay:0.05s;">
+      <div class="mono accent" style="font-size:10px;letter-spacing:0.15em;width:48px;">.PDF</div>
+      <div>
+        <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">Fact Sheet (One-Pager)</div>
+        <div class="mono" style="font-size:10px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">PDF · 1 FILE · 1.2 MB</div>
+      </div>
+      <div class="dl-arrow mono" style="font-size:14px;color:rgba(232,230,223,0.6);">→</div>
+    </a></div>
+</section>
+
+<section style="padding:120px 48px;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:48px;">
+    <div><div class="section-label reveal">[ 04 / SCREENSHOTS ]</div></div>
+    <div>
+      <h2 class="reveal" style="font-size:34px;letter-spacing:-0.025em;line-height:1.2;font-weight:400;margin-bottom:14px;">Screen captures.</h2>
+      <p class="reveal" style="font-size:14px;color:rgba(232,230,223,0.6);max-width:520px;line-height:1.6;transition-delay:0.1s;">Click any image to download in 4K. All captures rendered in-engine in Unreal Engine 5.</p>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;">
+    <div class="shot reveal" style="aspect-ratio:16/9;">
+      <div class="shot-img" style="background:url(images/cavern.jpg) center/cover no-repeat;"></div>
+      <div class="shot-overlay">
+        <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.7);margin-bottom:6px;">SS_001 · 3840×2160 · 24.4 MB</div>
+        <div style="font-size:15px;letter-spacing:-0.01em;">Mangrove Village Teleporter — Level 01</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-rows:1fr 1fr;gap:14px;">
+      <div class="shot reveal" style="transition-delay:0.05s;">
+        <div class="shot-img" style="background:url(images/igapo.jpg) center/cover no-repeat;"></div>
+        <div class="shot-overlay">
+          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.7);margin-bottom:6px;">SS_002 · 3840×2160 · 18.1 MB</div>
+          <div style="font-size:15px;letter-spacing:-0.01em;">Amazonian Igapó — Butterfly Drone</div>
+        </div>
+      </div>
+      <div class="shot reveal" style="transition-delay:0.1s;">
+        <div class="shot-img" style="background:url(images/mangrove.jpg) center/cover no-repeat;"></div>
+        <div class="shot-overlay">
+          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.7);margin-bottom:6px;">SS_003 · 3840×2160 · 21.7 MB</div>
+          <div style="font-size:15px;letter-spacing:-0.01em;">Mangrove Boss — Incendio Igapó</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:0 48px 120px;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:32px;">
+    <div><div class="section-label reveal">[ 05 / VIDEO ]</div></div>
+    <h2 class="reveal" style="font-size:34px;letter-spacing:-0.025em;line-height:1.2;font-weight:400;">Official trailer.</h2>
+  </div>
+  <div class="reveal" style="position:relative;aspect-ratio:16/9;overflow:hidden;background:#000;">
+    <iframe width="100%" height="100%" src="https://www.youtube.com/embed/uhkBJS_n7Qc?rel=0" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;"></iframe>
+  </div>
+</section>
+
+<section style="padding:120px 48px;background:#14171a;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:48px;">
+    <div><div class="section-label reveal">[ 06 / AWARDS &amp; PRESS ]</div></div>
+    <h2 class="reveal" style="font-size:34px;letter-spacing:-0.025em;line-height:1.2;font-weight:400;">Recognition.</h2>
+  </div>
+  <div class="reveal" style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:48px;padding-bottom:36px;border-bottom:0.5px solid rgba(232,230,223,0.1);">
+    <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);padding-top:6px;">AWARDS</div>
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:14px 0;border-bottom:0.5px solid rgba(232,230,223,0.1);">
+        <div>
+          <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">Whitney Biennial 2026</div>
+          <div style="font-size:13px;color:rgba(232,230,223,0.6);">Featured exhibition — Camoflux: Incendio Igapó (playable installation)</div>
+        </div>
+        <div class="mono accent" style="font-size:10px;letter-spacing:0.12em;">2026</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:14px 0;border-bottom:0.5px solid rgba(232,230,223,0.1);">
+        <div>
+          <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">Whitney Museum artport Commission</div>
+          <div style="font-size:13px;color:rgba(232,230,223,0.6);">Camoflux Recall Grotto — acquired into permanent collection</div>
+        </div>
+        <div class="mono accent" style="font-size:10px;letter-spacing:0.12em;">2025</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:14px 0;border-bottom:0.5px solid rgba(232,230,223,0.1);">
+        <div>
+          <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">Radical Gaming · HEK Basel</div>
+          <div style="font-size:13px;color:rgba(232,230,223,0.6);">Featured artist — Haus der Elektronischen Künste, Switzerland</div>
+        </div>
+        <div class="mono accent" style="font-size:10px;letter-spacing:0.12em;">2021</div>
+      </div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(232,230,223,0.1);margin-bottom:1px;">
+    
+    <a href="https://www.gamescenes.org/play-itself-or-leo-castaneda-at-the-whitney-biennial-2026/" target="_blank" class="press-quote reveal" style="display:block;background:#14171a;padding:36px 32px;">
+      <p class="serif-italic" style="font-size:21px;letter-spacing:-0.015em;line-height:1.4;margin-bottom:24px;">"Not a game seeking art's legitimizing frame, but a project conceived from the outset to treat painting, 3D modeling, and game engine work as co-equal forms of making."</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:18px;border-top:0.5px solid rgba(232,230,223,0.15);" class="mono">
+        <span style="font-size:11px;letter-spacing:0.12em;">GAMESCENES · MATTEO BITTANTI</span>
+        <span style="font-size:10px;color:rgba(232,230,223,0.5);" class="press-meta">READ →</span>
+      </div>
+    </a>
+    <a href="https://www.gamescenes.org/play-itself-or-leo-castaneda-at-the-whitney-biennial-2026/" target="_blank" class="press-quote reveal" style="display:block;background:#14171a;padding:36px 32px;transition-delay:0.05s;">
+      <p class="serif-italic" style="font-size:21px;letter-spacing:-0.015em;line-height:1.4;margin-bottom:24px;">"What the museum is now hosting, directly and with apparent conviction, is play itself."</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:18px;border-top:0.5px solid rgba(232,230,223,0.15);" class="mono">
+        <span style="font-size:11px;letter-spacing:0.12em;">GAMESCENES · MATTEO BITTANTI</span>
+        <span style="font-size:10px;color:rgba(232,230,223,0.5);" class="press-meta">READ →</span>
+      </div>
+    </a>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:rgba(232,230,223,0.1);">
+    
+    <a href="https://killscreen.com/leo-castaneda/" target="_blank" class="press-quote reveal" style="display:block;background:#14171a;padding:28px 32px;">
+      <p class="serif-italic" style="font-size:16px;letter-spacing:-0.01em;line-height:1.45;margin-bottom:16px;">"Interrogating the core of interaction."</p>
+      <div class="mono" style="font-size:10px;letter-spacing:0.12em;padding-top:14px;border-top:0.5px solid rgba(232,230,223,0.15);display:flex;justify-content:space-between;">
+        <span>KILLSCREEN</span>
+        <span class="press-meta" style="color:rgba(232,230,223,0.5);">READ →</span>
+      </div>
+    </a>
+    <a href="https://rhizome.org/editorial/2018/may/01/artist-profile-leo-castaneda-1/" target="_blank" class="press-quote reveal" style="display:block;background:#14171a;padding:28px 32px;transition-delay:0.05s;">
+      <p class="serif-italic" style="font-size:16px;letter-spacing:-0.01em;line-height:1.45;margin-bottom:16px;">"A philosophical manifestation of the virtual."</p>
+      <div class="mono" style="font-size:10px;letter-spacing:0.12em;padding-top:14px;border-top:0.5px solid rgba(232,230,223,0.15);display:flex;justify-content:space-between;">
+        <span>RHIZOME</span>
+        <span class="press-meta" style="color:rgba(232,230,223,0.5);">READ →</span>
+      </div>
+    </a>
+    <a href="https://global-uploads.webflow.com/5a3b8af6706df50001a2fbf2/60b77ed72774afd4d3911628_PM_HEK_RadicalGaming%2BArtistList_EN.pdf" target="_blank" class="press-quote reveal" style="display:block;background:#14171a;padding:28px 32px;transition-delay:0.1s;">
+      <p class="serif-italic" style="font-size:16px;letter-spacing:-0.01em;line-height:1.45;margin-bottom:16px;">"Calls into question the concept of antagonism that defines traditional video games."</p>
+      <div class="mono" style="font-size:10px;letter-spacing:0.12em;padding-top:14px;border-top:0.5px solid rgba(232,230,223,0.15);display:flex;justify-content:space-between;">
+        <span>HEK BASEL</span>
+        <span class="press-meta" style="color:rgba(232,230,223,0.5);">READ →</span>
+      </div>
+    </a>
+  </div>
+</section>
+
+<section style="padding:120px 48px;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
+    <div><div class="section-label reveal">[ 07 / STUDIO ]</div></div>
+    <div style="max-width:760px;">
+      <h2 class="reveal" style="font-size:38px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:24px;">About Levels & Bosses</h2>
+      <p class="reveal" style="font-size:16px;line-height:1.7;color:rgba(232,230,223,0.78);margin-bottom:18px;transition-delay:0.0s;">Levels &amp; Bosses is an independent studio led by <strong>Leo Castañeda</strong> (b. 1988, Cali, Colombia), working at the intersection of fine art, philosophy, and game design. The studio's practice treats painting, 3D modeling, and game engine work as co-equal forms of making.</p><p class="reveal" style="font-size:16px;line-height:1.7;color:rgba(232,230,223,0.78);margin-bottom:18px;transition-delay:0.05s;">Castañeda's work has been shown at the Whitney Museum of American Art, Haus der Elektronischen Künste Basel, and Rhizome, and is held in the Whitney's permanent collection. His phrase <em>third-person ontology</em> describes a methodology where world-formation operates as philosophical proposition rather than genre convention.</p><p class="reveal" style="font-size:16px;line-height:1.7;color:rgba(232,230,223,0.78);margin-bottom:18px;transition-delay:0.1s;">Camoflux is published by Otro Inventario.</p>
+    </div>
+  </div>
+</section>
+
+<section style="padding:120px 48px;background:#14171a;">
+  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
+    <div><div class="section-label reveal">[ 08 / CONTACT ]</div></div>
+    <div style="max-width:760px;">
+      <h2 class="reveal" style="font-size:38px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:32px;">Get in touch.</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
+        <div class="reveal">
+          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">PRESS &amp; MEDIA</div>
+          <a href="mailto:press@levelsandbosses.com" style="font-size:18px;letter-spacing:-0.01em;color:#e8e6df;">press@levelsandbosses.com</a>
+          <div style="font-size:13px;color:rgba(232,230,223,0.55);margin-top:8px;line-height:1.5;">For interviews, review codes, and editorial coverage.</div>
+        </div>
+        <div class="reveal" style="transition-delay:0.05s;">
+          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">BUSINESS &amp; CURATION</div>
+          <a href="mailto:hello@levelsandbosses.com" style="font-size:18px;letter-spacing:-0.01em;color:#e8e6df;">hello@levelsandbosses.com</a>
+          <div style="font-size:13px;color:rgba(232,230,223,0.55);margin-top:8px;line-height:1.5;">For partnerships, exhibitions, and acquisitions.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer style="padding:48px;background:#0a0b0d;border-top:0.5px solid rgba(232,230,223,0.1);display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:36px;" class="mono">
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <div class="rec-dot" style="width:6px;height:6px;background:#d8ff3a;border-radius:50%;"></div>
+      <div style="font-size:12px;font-weight:500;letter-spacing:0.05em;">CAMOFLUX <span style="color:rgba(232,230,223,0.4);">/ LEVELS & BOSSES</span></div>
+    </div>
+    <div style="color:rgba(232,230,223,0.45);font-size:10px;line-height:1.7;letter-spacing:0.05em;">© LEVELS & BOSSES · OTRO INVENTARIO<br/>NEWSLETTER SIGNUP →</div>
+  </div>
+  <div>
+    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ PLAY ]</div>
+    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;">
+      <a href="https://store.steampowered.com/app/897980/Camoflux_Levels__Bosses/" target="_blank">STEAM</a><br/>
+      <a href="presskit.html">PRESS KIT</a><br/>
+      <a href="exhibition.html">EXHIBITION</a>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ FOLLOW ]</div>
+    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;">
+      <a href="https://www.youtube.com/@levelsandbosses" target="_blank">YOUTUBE</a><br/>
+      <a href="https://www.instagram.com/levelsandbosses/" target="_blank">INSTAGRAM</a><br/>
+      <a href="https://x.com/LevelsandBosses" target="_blank">X / THREADS</a><br/>
+      <a href="https://www.tiktok.com/@levelsandbosses" target="_blank">TIKTOK</a>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ CONTACT ]</div>
+    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;"><a href="mailto:press@levelsandbosses.com">PRESS@LEVELSANDBOSSES.COM</a></div>
+  </div>
+</footer>
+<script>
+const reveals = document.querySelectorAll('.reveal');
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
+reveals.forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>

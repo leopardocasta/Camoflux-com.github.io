@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Camoflux — Mobile</title>
+<meta name="description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="images/favicon-180.png">
+<meta property="og:title" content="Camoflux — Levels & Bosses">
+<meta property="og:description" content="A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.">
+<meta property="og:image" content="images/og.jpg">
+<link rel="preload" as="image" href="images/cavern.jpg" fetchpriority="high">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{background:#0a0b0d;color:#e8e6df;font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{overflow-x:hidden}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.serif-italic{font-family:Georgia,serif;font-style:italic}
+.corner{position:absolute;width:10px;height:10px;pointer-events:none}
+.accent{color:#d8ff3a}
+.section-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.22em;color:rgba(232,230,223,0.45)}
+a{color:inherit;text-decoration:none}
+em{font-family:Georgia,serif;font-style:italic;font-weight:400}
+.btn-primary{background:#d8ff3a;color:#0a0b0d;padding:14px 22px;font-size:12px;letter-spacing:0.08em;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;border:none;font-family:'Inter',sans-serif;width:100%;text-align:center}
+.btn-secondary{border:0.5px solid rgba(232,230,223,0.5);background:rgba(232,230,223,0.06);padding:14px 22px;font-size:12px;letter-spacing:0.08em;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;color:#e8e6df;font-family:'Inter',sans-serif;width:100%;text-align:center;transition:background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease}
+.btn-secondary:active{background:#e8e6df;color:#0a0b0d;border-color:#e8e6df;box-shadow:0 0 32px rgba(232,230,223,0.45)}
+.btn-secondary:active .play-arrow{border-left-color:#0a0b0d}
+.play-arrow{transition:border-left-color 0.25s ease}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
+.rec-dot{display:inline-block;animation:pulse-dot 1.6s ease-in-out infinite}
+@keyframes pulse-status{0%,100%{opacity:1}50%{opacity:0.5}}
+.status-live{animation:pulse-status 2s ease-in-out infinite}
+@keyframes ken-burns{0%{transform:scale(1.0)}50%{transform:scale(1.1)}100%{transform:scale(1.0)}}
+.hero-bg{position:absolute;inset:0;animation:ken-burns 24s ease-in-out infinite;will-change:transform}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.marquee{display:flex;gap:32px;animation:marquee 30s linear infinite;width:max-content}
+.marquee-wrap{overflow:hidden;mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.reveal{opacity:0;transform:translateY(16px);transition:opacity 0.7s cubic-bezier(0.2,0.6,0.2,1), transform 0.7s cubic-bezier(0.2,0.6,0.2,1)}
+.reveal.in{opacity:1;transform:translateY(0)}
+.menu-overlay{position:fixed;inset:0;background:rgba(10,11,13,0.97);backdrop-filter:blur(20px);z-index:100;display:flex;flex-direction:column;padding:80px 24px 24px;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.2,0.6,0.2,1);gap:24px}
+.menu-overlay.open{transform:translateX(0)}
+.hamburger{width:28px;height:18px;position:relative;cursor:pointer;background:none;border:none;padding:0}
+.hamburger span{display:block;position:absolute;height:1.5px;width:100%;background:#e8e6df;left:0;transition:all 0.3s ease}
+.hamburger span:nth-child(1){top:0}
+.hamburger span:nth-child(2){top:50%;transform:translateY(-50%)}
+.hamburger span:nth-child(3){bottom:0}
+.hamburger.open{z-index:200}
+.hamburger.open span:nth-child(1){top:50%;transform:translateY(-50%) rotate(45deg)}
+.hamburger.open span:nth-child(2){opacity:0}
+.hamburger.open span:nth-child(3){bottom:50%;transform:translateY(50%) rotate(-45deg)}
+.phone-frame{max-width:430px;margin:24px auto;background:#0a0b0d;border:8px solid #1a1d20;border-radius:48px;overflow:hidden;box-shadow:0 40px 80px -20px rgba(0,0,0,0.6);position:relative}
+.phone-frame::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:28px;background:#1a1d20;border-radius:0 0 18px 18px;z-index:200}
+.phone-content{height:920px;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.phone-content::-webkit-scrollbar{display:none}
+.preview-wrapper{padding:24px;background:linear-gradient(135deg,#1a1d20,#2c2f33);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
+.preview-label{color:rgba(232,230,223,0.6);font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.18em;margin-bottom:8px;text-transform:uppercase}
+.scroll-row{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.scroll-row::-webkit-scrollbar{display:none}
+@media (max-width:480px){.preview-wrapper{padding:0;background:#0a0b0d}.preview-label{display:none}.phone-frame{margin:0;border:none;border-radius:0}.phone-frame::before{display:none}.phone-content{height:auto;overflow:visible}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important}.hero-bg{animation:none}.reveal{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="preview-wrapper">
+  <div class="preview-label">CAMOFLUX · MOBILE PREVIEW · 414 × 920</div>
+  <div class="phone-frame">
+    <div class="phone-content" id="content">
+      
+<header style="position:sticky;top:0;z-index:60;display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:rgba(10,11,13,0.85);backdrop-filter:blur(12px);border-bottom:0.5px solid rgba(232,230,223,0.1);" class="mono">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div class="rec-dot" style="width:6px;height:6px;background:#d8ff3a;border-radius:50%;"></div>
+    <a href="index.html" style="font-size:11px;font-weight:500;letter-spacing:0.05em;">CAMOFLUX</a>
+    <span style="color:rgba(232,230,223,0.4);font-size:10px;letter-spacing:0.18em;margin-left:8px;">[ PART ONE ]</span>
+  </div>
+  <button class="hamburger" id="menu-btn" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+
+<div class="menu-overlay" id="menu">
+  <div class="mono" style="font-size:9px;letter-spacing:0.22em;color:rgba(232,230,223,0.45);">[ NAVIGATION ]</div>
+  <nav style="display:flex;flex-direction:column;gap:24px;flex:1;">
+    <a href="#world" style="font-size:32px;letter-spacing:-0.025em;font-weight:500;">World</a><a href="#features" style="font-size:32px;letter-spacing:-0.025em;font-weight:500;">Features</a><a href="#press" style="font-size:32px;letter-spacing:-0.025em;font-weight:500;">Press</a><a href="#studio" style="font-size:32px;letter-spacing:-0.025em;font-weight:500;">Studio</a><a href="merch.html" style="font-size:32px;letter-spacing:-0.025em;font-weight:500;">Merch</a><a href="devlog.html" style="font-size:32px;letter-spacing:-0.025em;font-weight:500;">Devlog</a>
+  </nav>
+  <div style="border-top:0.5px solid rgba(232,230,223,0.15);padding-top:24px;">
+    <div class="mono" style="font-size:9px;letter-spacing:0.22em;color:rgba(232,230,223,0.45);margin-bottom:14px;">[ FOLLOW ]</div>
+    <div style="display:flex;gap:18px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.12em;color:rgba(232,230,223,0.6);">
+      <a href="https://www.youtube.com/@levelsandbosses" target="_blank">YT</a>
+      <a href="https://www.instagram.com/levelsandbosses/" target="_blank">IG</a>
+      <a href="https://x.com/LevelsandBosses" target="_blank">X</a>
+      <a href="https://www.tiktok.com/@levelsandbosses" target="_blank">TT</a>
+    </div>
+  </div>
+  <a href="https://store.steampowered.com/app/897980/Camoflux_Levels__Bosses/" target="_blank" class="btn-primary">WISHLIST ON STEAM →</a>
+</div>
+
+<section style="position:relative;height:560px;overflow:hidden;">
+  <div class="hero-bg" style="background:url(images/cavern.jpg) center/cover no-repeat;"></div>
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,11,13,0.5) 0%,rgba(10,11,13,0.2) 30%,rgba(10,11,13,0.5) 65%,rgba(10,11,13,0.95) 100%);"></div>
+  <div style="position:absolute;top:18px;left:20px;right:20px;display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.65);" class="mono">
+    <div>[ PART_01 ]</div>
+    <div class="accent status-live">● REC</div>
+  </div>
+  <div class="corner" style="top:14px;left:16px;border-left:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
+  <div class="corner" style="top:14px;right:16px;border-right:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
+  <div class="corner" style="bottom:14px;left:16px;border-left:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
+  <div class="corner" style="bottom:14px;right:16px;border-right:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
+  <div style="position:absolute;bottom:32px;left:24px;right:24px;">
+    <div class="mono" style="font-size:9px;letter-spacing:0.22em;color:rgba(232,230,223,0.65);margin-bottom:14px;">EPISODIC EXPLORATION · 2026</div>
+    <h1 style="font-size:42px;line-height:0.98;letter-spacing:-0.035em;font-weight:500;margin-bottom:16px;">Where landscape, body, and technology fuse.</h1>
+    <p style="font-size:13px;line-height:1.55;color:rgba(232,230,223,0.78);margin-bottom:18px;">A hand-painted third-person ontology. Camouflage. Channel circuits of environmental energy. Reshape a cyclical cataclysm.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <a href="https://store.steampowered.com/app/897980/Camoflux_Levels__Bosses/" target="_blank" class="btn-primary">WISHLIST ON STEAM →</a>
+      <a href="https://www.youtube.com/watch?v=uhkBJS_n7Qc" target="_blank" class="btn-secondary">
+        <div class="play-arrow" style="width:0;height:0;border-left:6px solid #e8e6df;border-top:4px solid transparent;border-bottom:4px solid transparent;"></div>
+        WATCH TRAILER · 02:14
+      </a>
+    </div>
+  </div>
+</section>
+
+<section style="padding:14px 20px;background:#14171a;display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.15em;color:rgba(232,230,223,0.55);border-bottom:0.5px solid rgba(232,230,223,0.08);" class="mono">
+  <span>STATUS: <span class="accent">PRE-RELEASE</span></span>
+  <span>EP 01/IIII · UE5</span>
+</section>
+
+<section style="padding:24px 20px;background:#0f1012;border-bottom:0.5px solid rgba(232,230,223,0.08);">
+  <div class="section-label" style="margin-bottom:6px;">[ NOW SHOWING ]</div>
+  <div style="font-size:16px;letter-spacing:-0.01em;font-weight:500;margin-bottom:10px;">Whitney Biennial 2026</div>
+  <div class="serif-italic" style="font-size:13px;color:rgba(232,230,223,0.7);line-height:1.55;margin-bottom:14px;">"What the museum is now hosting, directly and with apparent conviction, is play itself."</div>
+  <a href="exhibition.html" class="mono accent" style="font-size:10px;letter-spacing:0.15em;">VISIT · MARCH 8 — AUGUST 23, 2026 →</a>
+</section>
+
+<section class="marquee-wrap" style="padding:14px 0;background:#0a0b0d;border-bottom:0.5px solid rgba(232,230,223,0.08);">
+  <div class="marquee mono" style="font-size:11px;letter-spacing:0.15em;color:rgba(232,230,223,0.45);">
+    <span>HAND-PAINTED</span><span class="accent">●</span><span>EPISODIC</span><span class="accent">●</span><span>THIRD-PERSON ONTOLOGY</span><span class="accent">●</span><span>UNREAL ENGINE 5</span><span class="accent">●</span><span>WHITNEY BIENNIAL 2026</span><span class="accent">●</span><span>HAND-PAINTED</span><span class="accent">●</span><span>EPISODIC</span><span class="accent">●</span><span>THIRD-PERSON ONTOLOGY</span><span class="accent">●</span><span>UNREAL ENGINE 5</span><span class="accent">●</span><span>WHITNEY BIENNIAL 2026</span><span class="accent">●</span>
+  </div>
+</section>
+
+<section style="padding:56px 24px;">
+  <div class="section-label reveal" style="margin-bottom:18px;">[ PART_01 ]</div>
+  <h2 class="reveal" style="font-size:34px;letter-spacing:-0.03em;line-height:1.05;font-weight:500;margin-bottom:18px;">You are <em>The Other</em>.</h2>
+  <p class="reveal" style="font-size:14px;line-height:1.65;color:rgba(232,230,223,0.7);">A third-person ontology where landscapes, bodies, and technology fuse. Adapt through vibrational terraforming, camouflage, and electromagnetic sensors. Choose to destroy bosses — or engage with them.</p>
+</section>
+
+<section style="padding:0 24px 56px;">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px;" class="mono">
+    <div class="section-label">[ FEATURES ]</div>
+    <div style="font-size:9px;letter-spacing:0.15em;color:rgba(232,230,223,0.4);">04 SYSTEMS</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:32px;">
+    
+    <article class="reveal">
+      <div style="aspect-ratio:16/9;background:url(images/igapo-sm.jpg) center/cover no-repeat;position:relative;margin-bottom:14px;"><div class="mono accent" style="position:absolute;top:10px;left:10px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:4px 8px;">SYS_01</div></div>
+      <div class="mono" style="font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:8px;">WORLDS / IGAPÓ</div>
+      <h3 style="font-size:22px;letter-spacing:-0.025em;margin-bottom:8px;font-weight:500;">Vibrational terraforming</h3>
+      <p style="font-size:14px;color:rgba(232,230,223,0.65);line-height:1.55;">Glide through interconnected lands where every entity — terrain, body, machine — shares sentience.</p>
+    </article>
+    <article class="reveal">
+      <div style="aspect-ratio:16/9;background:url(images/mangrove-sm.jpg) center/cover no-repeat;position:relative;margin-bottom:14px;"><div class="mono accent" style="position:absolute;top:10px;left:10px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:4px 8px;">SYS_02</div></div>
+      <div class="mono" style="font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:8px;">BOSSES / MANGROVE</div>
+      <h3 style="font-size:22px;letter-spacing:-0.025em;margin-bottom:8px;font-weight:500;">Antagonism, reimagined</h3>
+      <p style="font-size:14px;color:rgba(232,230,223,0.65);line-height:1.55;">Destroy bosses — or dynamically engage with adversarial beings. The choice is the system.</p>
+    </article>
+    <article class="reveal">
+      <div style="aspect-ratio:16/9;background:url(images/cavern-sm.jpg) center/cover no-repeat;position:relative;margin-bottom:14px;"><div class="mono accent" style="position:absolute;top:10px;left:10px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:4px 8px;">SYS_03</div></div>
+      <div class="mono" style="font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:8px;">BODY / CAMOUFLAGE</div>
+      <h3 style="font-size:22px;letter-spacing:-0.025em;margin-bottom:8px;font-weight:500;">Neo-primordial embodiment</h3>
+      <p style="font-size:14px;color:rgba(232,230,223,0.65);line-height:1.55;">Customize through camouflage. Switch bodies. Become other.</p>
+    </article>
+    <article class="reveal">
+      <div style="aspect-ratio:16/9;background:linear-gradient(135deg,#1a1d20,#2c2f33);position:relative;margin-bottom:14px;display:flex;align-items:center;justify-content:center;"><div class="mono accent" style="position:absolute;top:10px;left:10px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:4px 8px;">SYS_04</div><div class="mono" style="font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.5);">[ PROCESS DOC ]</div></div>
+      <div class="mono" style="font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:8px;">CRAFT / UE5</div>
+      <h3 style="font-size:22px;letter-spacing:-0.025em;margin-bottom:8px;font-weight:500;">Painted in Unreal 5</h3>
+      <p style="font-size:14px;color:rgba(232,230,223,0.65);line-height:1.55;">Romantic and Surrealist painting meets VR sculpting and Unreal Engine 5.</p>
+    </article>
+  </div>
+</section>
+
+<section style="padding:0 24px 56px;">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px;" class="mono">
+    <div class="section-label">[ TRAILER ]</div>
+    <div style="font-size:9px;letter-spacing:0.15em;color:rgba(232,230,223,0.4);">02:14 · 4K</div>
+  </div>
+  <a href="https://www.youtube.com/watch?v=uhkBJS_n7Qc" target="_blank" style="position:relative;aspect-ratio:16/9;overflow:hidden;display:block;background:url(https://img.youtube.com/vi/uhkBJS_n7Qc/maxresdefault.jpg) center/cover no-repeat;">
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(10,11,13,0.7) 100%);"></div>
+    <div class="mono" style="position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.15em;color:rgba(232,230,223,0.7);">
+      <span class="accent status-live">● LIVE FEED</span>
+      <span>YT://uhkBJS_n7Qc</span>
+    </div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border:1px solid rgba(232,230,223,0.85);border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(10,11,13,0.4);">
+      <div style="width:0;height:0;border-left:14px solid #e8e6df;border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:4px;"></div>
+    </div>
+  </a>
+</section>
+
+<section style="padding:56px 0;background:#14171a;">
+  <div style="padding:0 24px;margin-bottom:20px;">
+    <div class="section-label reveal" style="margin-bottom:14px;">[ PRESS ]</div>
+    <h2 class="reveal" style="font-size:24px;letter-spacing:-0.025em;line-height:1.2;font-weight:400;">Critics on the practice.</h2>
+  </div>
+  <div class="scroll-row" style="padding:0 24px 8px;">
+    <div style="display:flex;gap:14px;width:max-content;">
+      
+      <a href="https://www.gamescenes.org/play-itself-or-leo-castaneda-at-the-whitney-biennial-2026/" target="_blank" class="press-card-m" style="background:#0a0b0d;padding:22px;width:280px;flex-shrink:0;border:0.5px solid rgba(232,230,223,0.1);display:block;">
+        <p class="serif-italic" style="font-size:16px;letter-spacing:-0.01em;line-height:1.4;margin-bottom:18px;">"Not a game seeking art's legitimizing frame, but a project conceived from the outset to treat painting, 3D modeling, and game engine work as co-equal forms of making."</p>
+        <div style="display:flex;justify-content:space-between;padding-top:14px;border-top:0.5px solid rgba(232,230,223,0.15);" class="mono">
+          <span style="font-size:10px;letter-spacing:0.12em;">GAMESCENES</span>
+          <span style="font-size:9px;color:rgba(232,230,223,0.5);" class="press-meta">2026.03 · READ →</span>
+        </div>
+      </a>
+      <a href="https://www.gamescenes.org/play-itself-or-leo-castaneda-at-the-whitney-biennial-2026/" target="_blank" class="press-card-m" style="background:#0a0b0d;padding:22px;width:280px;flex-shrink:0;border:0.5px solid rgba(232,230,223,0.1);display:block;">
+        <p class="serif-italic" style="font-size:16px;letter-spacing:-0.01em;line-height:1.4;margin-bottom:18px;">"What the museum is now hosting, directly and with apparent conviction, is play itself."</p>
+        <div style="display:flex;justify-content:space-between;padding-top:14px;border-top:0.5px solid rgba(232,230,223,0.15);" class="mono">
+          <span style="font-size:10px;letter-spacing:0.12em;">GAMESCENES</span>
+          <span style="font-size:9px;color:rgba(232,230,223,0.5);" class="press-meta">2026.03 · READ →</span>
+        </div>
+      </a>
+      <a href="https://killscreen.com/leo-castaneda/" target="_blank" class="press-card-m" style="background:#0a0b0d;padding:22px;width:240px;flex-shrink:0;border:0.5px solid rgba(232,230,223,0.1);display:block;">
+        <p class="serif-italic" style="font-size:15px;letter-spacing:-0.01em;line-height:1.45;margin-bottom:16px;">"Interrogating the core of interaction."</p>
+        <div class="mono" style="font-size:10px;letter-spacing:0.12em;padding-top:12px;border-top:0.5px solid rgba(232,230,223,0.15);display:flex;justify-content:space-between;">
+          <span>KILLSCREEN</span>
+          <span class="press-meta" style="color:rgba(232,230,223,0.5);">READ →</span>
+        </div>
+      </a>
+      <a href="https://rhizome.org/editorial/2018/may/01/artist-profile-leo-castaneda-1/" target="_blank" class="press-card-m" style="background:#0a0b0d;padding:22px;width:240px;flex-shrink:0;border:0.5px solid rgba(232,230,223,0.1);display:block;">
+        <p class="serif-italic" style="font-size:15px;letter-spacing:-0.01em;line-height:1.45;margin-bottom:16px;">"A philosophical manifestation of the virtual."</p>
+        <div class="mono" style="font-size:10px;letter-spacing:0.12em;padding-top:12px;border-top:0.5px solid rgba(232,230,223,0.15);display:flex;justify-content:space-between;">
+          <span>RHIZOME</span>
+          <span class="press-meta" style="color:rgba(232,230,223,0.5);">READ →</span>
+        </div>
+      </a>
+      <a href="https://global-uploads.webflow.com/5a3b8af6706df50001a2fbf2/60b77ed72774afd4d3911628_PM_HEK_RadicalGaming%2BArtistList_EN.pdf" target="_blank" class="press-card-m" style="background:#0a0b0d;padding:22px;width:240px;flex-shrink:0;border:0.5px solid rgba(232,230,223,0.1);display:block;">
+        <p class="serif-italic" style="font-size:15px;letter-spacing:-0.01em;line-height:1.45;margin-bottom:16px;">"Calls into question the concept of antagonism that defines traditional video games."</p>
+        <div class="mono" style="font-size:10px;letter-spacing:0.12em;padding-top:12px;border-top:0.5px solid rgba(232,230,223,0.15);display:flex;justify-content:space-between;">
+          <span>HEK BASEL</span>
+          <span class="press-meta" style="color:rgba(232,230,223,0.5);">READ →</span>
+        </div>
+      </a>
+    </div>
+  </div>
+  <div style="padding:18px 24px 0;text-align:right;">
+    <a href="presskit.html" class="mono accent" style="font-size:10px;letter-spacing:0.15em;">FULL PRESS KIT →</a>
+  </div>
+</section>
+
+<section style="padding:56px 0;">
+  <div style="padding:0 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:baseline;" class="mono">
+    <div class="section-label">[ MERCH ]</div>
+    <a href="merch.html" class="accent" style="font-size:10px;letter-spacing:0.15em;">SHOP ALL →</a>
+  </div>
+  <div class="scroll-row" style="padding:0 24px 8px;">
+    <div style="display:flex;gap:16px;width:max-content;">
+      
+      <a href="merch.html" class="merch-card-m" style="display:block;width:240px;flex-shrink:0;">
+        <div style="aspect-ratio:1/1;background:url(images/cavern-sm.jpg) center/cover no-repeat;position:relative;margin-bottom:12px;">
+          <div class="mono accent" style="position:absolute;top:10px;left:10px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:4px 8px;">ART PRINT</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+          <h3 style="font-size:15px;letter-spacing:-0.015em;font-weight:500;">Incendio Igapó</h3>
+          <div class="mono" style="font-size:12px;letter-spacing:0.05em;">$280</div>
+        </div>
+        <div class="mono" style="font-size:9px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">Edition of 50</div>
+      </a>
+      <a href="merch.html" class="merch-card-m" style="display:block;width:240px;flex-shrink:0;">
+        <div style="aspect-ratio:1/1;background:url(images/igapo-sm.jpg) center/cover no-repeat;position:relative;margin-bottom:12px;">
+          <div class="mono accent" style="position:absolute;top:10px;left:10px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:4px 8px;">ART PRINT</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+          <h3 style="font-size:15px;letter-spacing:-0.015em;font-weight:500;">Butterfly Drone</h3>
+          <div class="mono" style="font-size:12px;letter-spacing:0.05em;">$180</div>
+        </div>
+        <div class="mono" style="font-size:9px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">Edition of 75</div>
+      </a>
+      <a href="merch.html" class="merch-card-m" style="display:block;width:240px;flex-shrink:0;">
+        <div style="aspect-ratio:1/1;background:url(images/mangrove-sm.jpg) center/cover no-repeat;position:relative;margin-bottom:12px;">
+          <div class="mono accent" style="position:absolute;top:10px;left:10px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:4px 8px;">ART PRINT</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+          <h3 style="font-size:15px;letter-spacing:-0.015em;font-weight:500;">Mangrove Boss</h3>
+          <div class="mono" style="font-size:12px;letter-spacing:0.05em;">$280</div>
+        </div>
+        <div class="mono" style="font-size:9px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">Edition of 50</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section style="padding:56px 24px;">
+  <div class="section-label reveal" style="margin-bottom:14px;">[ STUDIO ]</div>
+  <h2 class="reveal" style="font-size:28px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:16px;">Levels & Bosses</h2>
+  <p class="reveal" style="font-size:14px;color:rgba(232,230,223,0.7);line-height:1.65;margin-bottom:18px;">An independent studio led by Leo Castañeda working at the intersection of fine art, philosophy, and game design. Camoflux blends traditional painting, virtual reality sculpting, and Unreal Engine 5.</p>
+  <a href="#" class="mono accent" style="font-size:10px;letter-spacing:0.15em;">ABOUT THE STUDIO →</a>
+</section>
+
+<section style="position:relative;padding:72px 24px;text-align:center;overflow:hidden;">
+  <div class="hero-bg" style="background:url(images/cavern.jpg) center/cover no-repeat;animation-duration:32s;"></div>
+  <div style="position:absolute;inset:0;background:rgba(10,11,13,0.78);"></div>
+  <div class="corner" style="top:18px;left:20px;border-left:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
+  <div class="corner" style="top:18px;right:20px;border-right:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
+  <div class="corner" style="bottom:18px;left:20px;border-left:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
+  <div class="corner" style="bottom:18px;right:20px;border-right:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
+  <div style="position:relative;">
+    <div class="mono" style="font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.55);margin-bottom:18px;">[ TRANSMISSION ENDS ]</div>
+    <h2 style="font-size:44px;letter-spacing:-0.035em;line-height:1;margin-bottom:16px;font-weight:500;">Wishlist now.</h2>
+    <p style="font-size:13px;color:rgba(232,230,223,0.7);margin-bottom:24px;">Get notified the moment Camoflux releases.</p>
+    <a href="https://store.steampowered.com/app/897980/Camoflux_Levels__Bosses/" target="_blank" class="btn-primary">WISHLIST ON STEAM →</a>
+  </div>
+</section>
+
+<footer style="padding:32px 24px;background:#0a0b0d;border-top:0.5px solid rgba(232,230,223,0.1);" class="mono">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+    <div class="rec-dot" style="width:6px;height:6px;background:#d8ff3a;border-radius:50%;"></div>
+    <div style="font-size:11px;font-weight:500;letter-spacing:0.05em;">CAMOFLUX <span style="color:rgba(232,230,223,0.4);">/ LEVELS &amp; BOSSES</span></div>
+  </div>
+  <div style="color:rgba(232,230,223,0.45);font-size:9px;line-height:1.7;letter-spacing:0.05em;margin-bottom:24px;">© LEVELS &amp; BOSSES · OTRO INVENTARIO</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+    <div>
+      <div style="font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:10px;">[ FOLLOW ]</div>
+      <div style="font-size:10px;line-height:1.9;color:rgba(232,230,223,0.7);letter-spacing:0.05em;">
+        <a href="https://www.youtube.com/@levelsandbosses" target="_blank">YOUTUBE</a><br/>
+        <a href="https://www.instagram.com/levelsandbosses/" target="_blank">INSTAGRAM</a><br/>
+        <a href="https://x.com/LevelsandBosses" target="_blank">X / THREADS</a><br/>
+        <a href="https://www.tiktok.com/@levelsandbosses" target="_blank">TIKTOK</a>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:10px;">[ CONTACT ]</div>
+      <div style="font-size:10px;line-height:1.9;color:rgba(232,230,223,0.7);letter-spacing:0.05em;">PRESS@<br/>LEVELSANDBOSSES<br/>.COM</div>
+    </div>
+  </div>
+</footer>
+    </div>
+  </div>
+</div>
+
+<script>
+const reveals = document.querySelectorAll('.reveal');
+const root = document.getElementById('content');
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px', root: root });
+reveals.forEach(el => io.observe(el));
+
+const btn = document.getElementById('menu-btn');
+const menu = document.getElementById('menu');
+btn.addEventListener('click', () => {
+  btn.classList.toggle('open');
+  menu.classList.toggle('open');
+});
+menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+  btn.classList.remove('open');
+  menu.classList.remove('open');
+}));
+
+if (window.innerWidth <= 480) {
+  document.body.classList.add('standalone-mobile');
+}
+</script>
+</body>
+</html>
