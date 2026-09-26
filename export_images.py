@@ -1,99 +1,120 @@
 #!/usr/bin/env python3
 """Camoflux image exporter.
 
-Reads source PNGs from images_src/, exports optimized JPGs to images/ at multiple sizes.
-Re-run any time you add a new source image.
+Reads sources from images_src/ and writes web-ready files to images/.
+
+  Screenshots (any .png / .jpg except logo.png) get three variants:
+    <name>.jpg          1920 wide, q85   hero and full-width use
+    <name>-sm.jpg        960 wide, q82   cards, grids, mobile
+    <name>-master.jpg   native width, q92 press kit downloads
+
+  logo.png (white wordmark on transparency) becomes:
+    logo.png            1760 wide, trimmed   hero use (2x of 880px display)
+    logo-header.png       28 px tall, trimmed  header/footer (2x of 14px display)
+    logo-white.png      native, trimmed      press kit download (for dark backgrounds)
+    logo-black.png      native, trimmed      press kit download (for light backgrounds)
+
+  Derived: og.jpg (1200x630 share card), favicon-{16,32,180,512}.png
 
 Usage: python3 export_images.py
 """
-from PIL import Image, ImageDraw
 from pathlib import Path
-import os
-import sys
+from PIL import Image, ImageDraw, ImageOps
+import json
 
 ROOT = Path(__file__).parent
-SRC = ROOT / 'images_src'
-OUT = ROOT / 'images'
+SRC = ROOT / "images_src"
+OUT = ROOT / "images"
 OUT.mkdir(exist_ok=True)
 
-# Output configurations
-CONFIGS = {
-    'main':   {'width': 1920, 'quality': 85, 'suffix': ''},
-    'small':  {'width': 960,  'quality': 82, 'suffix': '-sm'},
-    'master': {'width': 1920, 'quality': 92, 'suffix': '-master'},
-}
+OG_SOURCE = "hero-3d-still"   # which screenshot backs the social share card
+BG = (10, 11, 13)               # --c-bg
+ACCENT = (216, 255, 58)         # --c-accent
 
-# Discover all PNGs in source
-sources = sorted(SRC.glob('*.png'))
-if not sources:
-    print(f"No PNGs found in {SRC}. Drop source images there and re-run.")
-    sys.exit(1)
+VARIANTS = [
+    ("", 1920, 85),
+    ("-sm", 960, 82),
+    ("-master", None, 92),       # None = keep native width
+]
 
-print(f"Exporting {len(sources)} source image(s)...")
-print()
 
-for src_path in sources:
-    name = src_path.stem
-    src = Image.open(src_path).convert('RGB')
-    sw, sh = src.size
-    print(f"  {name}.png ({sw}×{sh})")
-    for cfg_name, cfg in CONFIGS.items():
-        w = cfg['width']
-        h = int(sh * w / sw)
-        img = src.resize((w, h), Image.LANCZOS) if w != sw else src
-        out_path = OUT / f'{name}{cfg["suffix"]}.jpg'
-        img.save(out_path, 'JPEG', quality=cfg['quality'], optimize=True, progressive=True)
-        sz = os.path.getsize(out_path)
-        print(f'    → {out_path.name}  ({img.size[0]}×{img.size[1]}, {sz/1024:.0f} KB)')
-    print()
+def save_jpg(img, path, q):
+    img.save(path, "JPEG", quality=q, optimize=True, progressive=True)
 
-# --- Generate derived assets ---
-# OG image: use the first source image, crop to 1200×630, add dark gradient
-if sources:
-    print("Building derived assets...")
-    src = Image.open(sources[0]).convert('RGB')
-    target_ratio = 1200 / 630
-    sw, sh = src.size
-    src_ratio = sw / sh
-    if src_ratio > target_ratio:
-        new_w = int(sh * target_ratio)
-        left = (sw - new_w) // 2
-        src = src.crop((left, 0, left + new_w, sh))
-    else:
-        new_h = int(sw / target_ratio)
-        top = (sh - new_h) // 2
-        src = src.crop((0, top, sw, top + new_h))
-    og = src.resize((1200, 630), Image.LANCZOS)
 
-    overlay = Image.new('RGBA', (1200, 630), (10, 11, 13, 0))
-    draw = ImageDraw.Draw(overlay)
+def resize_w(img, w):
+    if w is None or img.width <= w:
+        return img
+    return img.resize((w, round(img.height * w / img.width)), Image.LANCZOS)
+
+
+manifest = {}
+
+# ---- Screenshots ----
+for src in sorted([*SRC.glob("*.png"), *SRC.glob("*.jpg"), *SRC.glob("*.jpeg")]):
+    if src.stem in ("logo", "favicon-source"):
+        continue
+    img = Image.open(src).convert("RGB")
+    entry = {"width": img.width, "height": img.height}
+    print(f"{src.name}  {img.width}x{img.height}")
+    # Press kit masters are only needed for game screenshots; artwork and photos get web sizes only.
+    web_only = src.stem.startswith(("paint-", "draw-", "whitney-", "hero-", "supercon-"))
+    for suffix, w, q in VARIANTS:
+        if web_only and suffix == "-master":
+            continue
+        out = OUT / f"{src.stem}{suffix}.jpg"
+        v = resize_w(img, w)
+        save_jpg(v, out, q)
+        print(f"  {out.name:32s} {v.width}x{v.height}  {out.stat().st_size/1024:.0f} KB")
+    if not web_only:
+        master = Image.open(OUT / f"{src.stem}-master.jpg")
+        entry["master_width"], entry["master_height"] = master.size
+    manifest[src.stem] = entry
+
+# ---- Logo ----
+logo_src = SRC / "logo.png"
+if logo_src.exists():
+    logo = Image.open(logo_src).convert("RGBA")
+    logo = logo.crop(logo.getchannel("A").getbbox())
+    logo.save(OUT / "logo-white.png", optimize=True)
+    black = Image.new("RGBA", logo.size, (0, 0, 0, 255))
+    black.putalpha(logo.getchannel("A"))
+    black.save(OUT / "logo-black.png", optimize=True)
+    resize_w(logo, 1760).save(OUT / "logo.png", optimize=True)
+    h = 28
+    logo.resize((round(logo.width * h / logo.height), h), Image.LANCZOS).save(OUT / "logo-header.png", optimize=True)
+    manifest["logo"] = {"width": logo.width, "height": logo.height, "ratio": logo.width / logo.height}
+    print(f"logo.png  trimmed to {logo.width}x{logo.height}, ratio {logo.width/logo.height:.2f}")
+
+# ---- OG share card: screenshot + gradient + logo ----
+og_src = next(SRC.glob(f"{OG_SOURCE}.*"), None)
+if og_src:
+    base = ImageOps.fit(Image.open(og_src).convert("RGB"), (1200, 630), Image.LANCZOS)
+    shade = Image.new("RGBA", (1200, 630))
+    d = ImageDraw.Draw(shade)
     for y in range(630):
-        alpha = int(180 * (y / 630) ** 1.5) + 80
-        draw.line([(0, y), (1200, y)], fill=(10, 11, 13, min(alpha, 230)))
-    og_final = Image.alpha_composite(og.convert('RGBA'), overlay).convert('RGB')
-    og_final.save(OUT / 'og.jpg', 'JPEG', quality=88, optimize=True, progressive=True)
-    sz = os.path.getsize(OUT / 'og.jpg')
-    print(f'  → og.jpg  (1200×630, {sz/1024:.0f} KB)')
+        d.line([(0, y), (1200, y)], fill=(*BG, int(90 + 140 * (y / 630) ** 1.4)))
+    og = Image.alpha_composite(base.convert("RGBA"), shade)
+    if logo_src.exists():
+        lw = 840
+        lg = logo.resize((lw, round(logo.height * lw / logo.width)), Image.LANCZOS)
+        og.alpha_composite(lg, ((1200 - lw) // 2, 630 - lg.height - 96))
+    save_jpg(og.convert("RGB"), OUT / "og.jpg", 88)
+    print("og.jpg  1200x630")
 
-# Favicon: chartreuse dot on near-black
-fav = Image.new('RGBA', (512, 512), (10, 11, 13, 255))
-draw = ImageDraw.Draw(fav)
-cx, cy, r = 256, 256, 140
-draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=(216, 255, 58, 255))
-fav.save(OUT / 'favicon-512.png', 'PNG', optimize=True)
-for s in [180, 32, 16]:
-    f = fav.resize((s, s), Image.LANCZOS)
-    f.save(OUT / f'favicon-{s}.png', 'PNG', optimize=True)
-print(f'  → favicons (16, 32, 180, 512)')
+# ---- Favicons: the game's joystick plate icon on black (falls back to an accent dot) ----
+fav_src = SRC / "favicon-source.png"
+if fav_src.exists():
+    icon = Image.open(fav_src).convert("RGBA")
+    fav = Image.new("RGBA", (512, 512), (0, 0, 0, 255))
+    icon = icon.resize((472, 472), Image.LANCZOS); fav.alpha_composite(icon, (20, 20))
+else:
+    fav = Image.new("RGBA", (512, 512), (*BG, 255))
+    ImageDraw.Draw(fav).ellipse([116, 116, 396, 396], fill=(*ACCENT, 255))
+for s in (512, 180, 32, 16):
+    fav.resize((s, s), Image.LANCZOS).save(OUT / f"favicon-{s}.png", optimize=True)
+print("favicons 16/32/180/512")
 
-# Trailer thumbnail fallback (uses first source image as stand-in)
-if sources:
-    yt = Image.open(sources[0]).convert('RGB')
-    yt_resized = yt.resize((1280, 720), Image.LANCZOS)
-    yt_resized.save(OUT / 'trailer-thumb.jpg', 'JPEG', quality=85, optimize=True, progressive=True)
-    sz = os.path.getsize(OUT / 'trailer-thumb.jpg')
-    print(f'  → trailer-thumb.jpg  (1280×720, {sz/1024:.0f} KB)')
-
-print()
-total = sum(f.stat().st_size for f in OUT.iterdir() if f.is_file())
-print(f"Done. {OUT} = {total/1024/1024:.2f} MB total.")
+(OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
+total = sum(f.stat().st_size for f in OUT.iterdir())
+print(f"\nimages/ = {total/1024/1024:.2f} MB")

@@ -1,1497 +1,772 @@
 #!/usr/bin/env python3
 """Camoflux site builder.
 
-Reads content.py and emits all pages into ../output/.
-Run: python3 build.py
+  python3 export_images.py   # once, or after adding source images
+  python3 build.py           # regenerates site/ and lints it
+
+Markup is composed from small component functions. All styling lives in
+assets/site.css (tokens first). No inline styles are emitted.
 """
-import base64
-import os
+import html
+import json
+import re
+import shutil
 import sys
+import zipfile
+from datetime import date
 from pathlib import Path
 
-# Allow importing content.py from same dir
-sys.path.insert(0, str(Path(__file__).parent))
-from content import (
-    SITE, NAV, FEATURES, PRESS_FEATURED, PRESS_SHORT, AWARDS,
-    DOWNLOADS, DEVLOG, EXHIBITION, STUDIO, SOCIAL, MERCH,
-)
-
 ROOT = Path(__file__).parent
+sys.path.insert(0, str(ROOT))
+from content import (SITE, NAV, IMAGES, WORLD, FEATURES, PRESS_FEATURED, PRESS_SHORT,
+                     RECOGNITION, EXHIBITIONS, DEVLOG, STUDIO, MERCH, MERCH_NOTE, SOCIAL,
+                     ARTWORK, PAINTINGS, SKETCHBOOK, GAMEPLAY, COVERAGE)
+ALL_IMAGES = {**IMAGES, **ARTWORK}
+GAME_IMAGES = {k: v for k, v in IMAGES.items() if v.get('kind') == 'game'}
+import json as _json
+
+IMG_DIR = ROOT / "images"
 OUT = ROOT / "site"
-OUT.mkdir(parents=True, exist_ok=True)
+ERRORS = []
 
-# ---- Image references ----
-# Images live in ./images/ relative to each HTML page.
-# Each key has a 'main' (1920w) and 'small' (960w) variant.
-# Use main for hero/full-bleed contexts, small for cards & mobile.
+def e(s):
+    return html.escape(str(s), quote=True)
 
-def img(name, size='main'):
-    """Return a relative URL to an image file.
-    Sizes: 'main' (1920w), 'small' (960w, suffix -sm), 'master' (high-quality, suffix -master)
-    """
-    if size == 'small':
-        return f'images/{name}-sm.jpg'
-    elif size == 'master':
-        return f'images/{name}-master.jpg'
-    return f'images/{name}.jpg'
+def fmt_date(iso):
+    d = date.fromisoformat(iso)
+    return f"{d.strftime('%B')} {d.day}, {d.year}"
 
-# Convenience map for legacy code that just wants a default
-IMAGES = {
-    "cavern": img("cavern"),
-    "igapo": img("igapo"),
-    "mangrove": img("mangrove"),
+def fmt_size(n):
+    return f"{n/1024/1024:.1f} MB" if n > 1024 * 1024 else f"{n/1024:.0f} KB"
+
+MANIFEST = json.loads((IMG_DIR / "manifest.json").read_text()) if (IMG_DIR / "manifest.json").exists() else {}
+LOGO_RATIO = MANIFEST.get("logo", {}).get("ratio", 17.12)
+
+# ---------------------------------------------------------------- icons
+# Sized in CSS at 1em so they scale with the text beside them.
+ICON = {
+    "play": '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>',
+    "menu": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" stroke-width="1.5"/></svg>',
+    "prev": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+    "next": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
 }
-IMAGES_SM = {
-    "cavern": img("cavern", "small"),
-    "igapo": img("igapo", "small"),
-    "mangrove": img("mangrove", "small"),
-}
-YT_THUMB = f"https://img.youtube.com/vi/{SITE['youtube_id']}/maxresdefault.jpg"
-# Local fallback if YouTube CDN is blocked/slow:
-YT_THUMB_LOCAL = "images/trailer-thumb.jpg"
 
-def img_or_placeholder(key):
-    if key and key in IMAGES:
-        return f"background:url({IMAGES[key]}) center/cover no-repeat;"
-    return "background:linear-gradient(135deg,#1a1d20,#2c2f33);"
+# ---------------------------------------------------------------- primitives
 
-# ---- Shared CSS ----
-SHARED_CSS = """
-*{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
-html,body{background:#0a0b0d;color:#e8e6df;font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-body{min-width:1280px;overflow-x:hidden}
-.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
-.serif-italic{font-family:Georgia,serif;font-style:italic}
-.corner{position:absolute;width:14px;height:14px;pointer-events:none}
-.accent{color:#d8ff3a}
-.section-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.45)}
-a{color:inherit;text-decoration:none}
-em{font-family:Georgia,serif;font-style:italic;font-weight:400}
-strong{font-weight:500}
+def link(url, label, cls="link", download=False):
+    """Rules: no URL, no link. External links open in a new tab and carry ↗."""
+    if not url:
+        return ""
+    external = url.startswith("http")
+    attrs = f' class="{cls}"' if cls else ""
+    if external:
+        attrs += ' target="_blank" rel="noopener"'
+    if download:
+        attrs += " download"
+    arrow = ' <span class="ext" aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span>' if external else ""
+    return f'<a href="{e(url)}"{attrs}>{e(label)}{arrow}</a>'
 
-.btn-primary{background:#d8ff3a;color:#0a0b0d;padding:13px 24px;font-size:12px;letter-spacing:0.08em;font-weight:500;display:inline-flex;align-items:center;gap:10px;cursor:pointer;border:none;transition:transform 0.2s ease, box-shadow 0.2s ease;font-family:'Inter',sans-serif}
-.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 24px -8px rgba(216,255,58,0.35)}
-.btn-secondary{border:0.5px solid rgba(232,230,223,0.5);background:rgba(232,230,223,0.06);padding:13px 24px;font-size:12px;letter-spacing:0.08em;display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:#e8e6df;transition:background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, transform 0.2s ease;font-family:'Inter',sans-serif}
-.btn-secondary:hover{background:#e8e6df;color:#0a0b0d;border-color:#e8e6df;transform:translateY(-2px);box-shadow:0 0 32px rgba(232,230,223,0.45), 0 0 64px rgba(232,230,223,0.2)}
-.btn-secondary:hover .play-arrow{border-left-color:#0a0b0d}
-.play-arrow{transition:border-left-color 0.25s ease}
+def btn(url, label, variant="primary", size="", download=False):
+    cls = f"btn btn--{variant}" + (f" btn--{size}" if size else "")
+    return link(url, label, cls=cls, download=download)
 
-@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
-.rec-dot{display:inline-block;animation:pulse-dot 1.6s ease-in-out infinite}
-@keyframes pulse-status{0%,100%{opacity:1}50%{opacity:0.5}}
-.status-live{animation:pulse-status 2s ease-in-out infinite}
-@keyframes ken-burns{0%{transform:scale(1.0) translate(0,0)}50%{transform:scale(1.08) translate(-1%,-1%)}100%{transform:scale(1.0) translate(0,0)}}
-.hero-bg{position:absolute;inset:-2%;animation:ken-burns 24s ease-in-out infinite;will-change:transform}
-@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.marquee{display:flex;gap:48px;animation:marquee 40s linear infinite;width:max-content}
-.marquee-wrap{overflow:hidden;mask:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+def acc(html_text):
+    """AB-24h draws no accented letters; mark them so CSS can set them in the display face."""
+    return re.sub(r"([À-ÿ])", r'<span class="acc">\1</span>', html_text)
 
-.reveal{opacity:0;transform:translateY(24px);transition:opacity 0.9s cubic-bezier(0.2,0.6,0.2,1), transform 0.9s cubic-bezier(0.2,0.6,0.2,1)}
-.reveal.in{opacity:1;transform:translateY(0)}
+def meta(text, tag="span", cls=""):
+    return f'<{tag} class="t-meta{(" " + cls) if cls else ""}">{acc(e(text))}</{tag}>'
 
-nav .nav-link{position:relative;cursor:pointer;transition:color 0.2s ease}
-nav .nav-link:hover{color:#e8e6df}
-nav .nav-link::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1px;background:#d8ff3a;transition:width 0.3s ease}
-nav .nav-link:hover::after{width:100%}
-nav .nav-link.active{color:#e8e6df}
-nav .nav-link.active::after{width:100%}
+def img_path(key, size="sm"):
+    suffix = {"sm": "-sm", "main": "", "master": "-master"}[size]
+    return f"images/{key}{suffix}.jpg"
 
-@media (prefers-reduced-motion: reduce){
-  *,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important}
-  .hero-bg{animation:none}
-  .reveal{opacity:1;transform:none}
-}
-"""
+def check_image(key):
+    if key not in ALL_IMAGES:
+        ERRORS.append(f"image key '{key}' missing from IMAGES or ARTWORK in content.py")
+    if not (IMG_DIR / f"{key}.jpg").exists():
+        ERRORS.append(f"images/{key}.jpg not found; run export_images.py")
 
-# ---- Reusable fragments ----
-def fonts():
-    return """<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">"""
+def media(key, ar="16x9", size="sm", badge="", badge_right="", src=None, alt=None, fallback=None):
+    """Skeleton placeholder until the image loads (site.js), then fades in."""
+    if src is None:
+        check_image(key)
+        src = img_path(key, size)
+        alt = ALL_IMAGES.get(key, {}).get("alt", "")
+    b = f'<span class="badge t-meta">{e(badge)}</span>' if badge else ""
+    br = f'<span class="badge badge--right t-meta">{e(badge_right)}</span>' if badge_right else ""
+    fb = f' data-fallback="{e(fallback)}"' if fallback else ""
+    return (f'<div class="media ar-{ar}" data-src="{e(src)}"{fb}>{b}{br}'
+            f'<div class="media__img" role="img" aria-label="{e(alt)}"></div>'
+            f'<div class="media__status">{meta("Image unavailable")}</div>'
+            f'<noscript><img src="{e(src)}" alt="{e(alt)}"></noscript></div>')
 
+def frame():
+    return '<div class="frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>'
 
-def header(active=None):
-    """Sticky header. `active` = page name to mark active in nav."""
-    nav_html = ""
-    for item in NAV:
-        is_active = "active" if (active and item["label"].lower() == active.lower()) else ""
-        nav_html += f'<a href="{item["href"]}" class="nav-link {is_active}"><span>{item["label"]}</span></a>'
+def section(inner, id_="", alt=False, cls="", panel=True):
+    """Every section's content sits on a black panel over the ink ground."""
+    attrs = f' id="{id_}"' if id_ else ""
+    classes = "section" + (" section--alt" if alt else "") + (f" {cls}" if cls else "")
+    body = f'<div class="panel">{inner}</div>' if panel else inner
+    return f'<section{attrs} class="{classes}"><div class="wrap">{body}</div></section>'
 
-    return f"""<header style="position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;padding:18px 48px;border-bottom:0.5px solid rgba(232,230,223,0.12);background:rgba(10,11,13,0.85);backdrop-filter:blur(12px);" class="mono">
-  <div style="display:flex;align-items:center;gap:24px;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <div class="rec-dot" style="width:7px;height:7px;background:#d8ff3a;border-radius:50%;"></div>
-      <a href="index.html" style="letter-spacing:0.05em;font-weight:500;font-size:11px;">{SITE['title'].upper()} <span style="color:rgba(232,230,223,0.45);">/ {SITE['subtitle'].upper()}</span></a>
-    </div>
-    <div style="color:rgba(232,230,223,0.4);font-size:10px;letter-spacing:0.18em;">[ PART ONE ]</div>
+def split(label, inner):
+    return f'<div class="split">{meta(label, "p")}<div>{inner}</div></div>'
+
+def row_head(title, right=""):
+    return f'<div class="row-head"><h2 class="t-h2">{e(title)}</h2>{right}</div>'
+
+def prose(paragraphs):
+    return '<div class="prose">' + "".join(f"<p>{p}</p>" for p in paragraphs) + "</div>"
+
+def rail(track_cls, items_html, label):
+    n = items_html.count('class="quote') or 1
+    return (f'<div class="rail" role="region" aria-label="{e(label)}">'
+            f'<div class="rail__track {track_cls}">{items_html}</div>'
+            f'<div class="rail__controls">{meta("01 / " + str(n).zfill(2), cls="rail__count")}'
+            f'<div class="rail__btns"><button class="rail__btn" data-dir="-1" aria-label="Previous">{ICON["prev"]}</button>'
+            f'<button class="rail__btn" data-dir="1" aria-label="Next">{ICON["next"]}</button></div></div></div>')
+
+# ---------------------------------------------------------------- shared chrome
+
+def nav_href(item, page):
+    if "anchor" in item:
+        return f"#{item['anchor']}" if page == "index" else f"index.html#{item['anchor']}"
+    return item["page"]
+
+def header(page):
+    items = ""
+    for it in NAV:
+        current = ' aria-current="page"' if it.get("page") == f"{page}.html" else ""
+        items += f'<a href="{nav_href(it, page)}"{current}>{e(it["label"])}</a>'
+    items += btn(SITE["steam_url"], "Wishlist on Steam", size="sm")
+    return f'''<a class="skip" href="#main">Skip to content</a>
+<header class="site-header" data-open="false">
+  <div class="brand">
+    <a href="index.html"><img src="images/logo-header.png" alt="{e(SITE["title"])}, home" width="{round(14*LOGO_RATIO)}" height="14"></a>
   </div>
-  <nav style="display:flex;gap:28px;color:rgba(232,230,223,0.65);letter-spacing:0.08em;font-size:11px;">
-    {nav_html}
-  </nav>
-  <a href="{SITE['steam_url']}" target="_blank" class="btn-primary" style="padding:8px 18px;font-size:11px;">WISHLIST →</a>
-</header>"""
+  <nav class="nav" aria-label="Main">{items}</nav>
+  <div class="header-cta">{btn(SITE["steam_url"], "Wishlist on Steam", size="sm")}</div>
+  <button class="menu-toggle" aria-expanded="false" aria-label="Open menu">{ICON["menu"]}</button>
+</header>'''
 
-
-def status_bar():
-    return f"""<section style="padding:14px 48px;background:#14171a;display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.55);border-bottom:0.5px solid rgba(232,230,223,0.08);" class="mono">
-  <div style="display:flex;gap:36px;">
-    <span>STATUS: <span class="accent">{SITE['status']}</span></span>
-    <span>EPISODE 0{SITE['episode_current']} / {'I' * SITE['episode_total']}</span>
-    <span>{SITE['engine']} · {SITE['platforms']}</span>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center;">
-    <span style="color:rgba(232,230,223,0.4);">SHIPPING</span>
-    <span>{SITE['release']}</span>
-  </div>
-</section>"""
-
+def footer_signup():
+    mc = SITE.get("mailchimp")
+    if not mc or not mc.get("action"):
+        return ""
+    return f'''<div class="footer-signup">
+    <p class="t-meta">Studio updates by email</p>
+    <form class="newsletter newsletter--sm" action="{e(mc["action"])}" method="post" target="_blank" novalidate data-mailchimp>
+      <label class="sr-only" for="mce-EMAIL">Email address</label>
+      <input id="mce-EMAIL" type="email" name="EMAIL" required placeholder="Email address" autocomplete="email">
+      <input type="hidden" name="tags" value="{e(mc["tags"])}">
+      <div class="sr-only" aria-hidden="true"><input type="text" name="{e(mc["honeypot"])}" tabindex="-1" value=""></div>
+      <button class="btn btn--primary btn--sm" type="submit">Subscribe</button>
+    </form>
+    <p class="form-msg t-small" role="status" aria-live="polite"></p>
+  </div>'''
 
 def footer():
-    return f"""<footer style="padding:48px;background:#0a0b0d;border-top:0.5px solid rgba(232,230,223,0.1);display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:36px;" class="mono">
+    follow = "".join(f"<li>{link(s['url'], s['label'], cls='')}</li>" for s in SOCIAL if s.get("url"))
+    contact = "".join(f"<li>{link('mailto:' + m, m, cls='')}</li>" for m in (SITE.get("press_email"), SITE.get("biz_email")) if m)
+    year = date.today().year
+    return f'''<footer class="site-footer"><div class="wrap cols">
   <div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-      <div class="rec-dot" style="width:6px;height:6px;background:#d8ff3a;border-radius:50%;"></div>
-      <div style="font-size:12px;font-weight:500;letter-spacing:0.05em;">{SITE['title'].upper()} <span style="color:rgba(232,230,223,0.4);">/ {SITE['subtitle'].upper()}</span></div>
-    </div>
-    <div style="color:rgba(232,230,223,0.45);font-size:10px;line-height:1.7;letter-spacing:0.05em;">© {STUDIO['name'].upper()} · {STUDIO['publisher'].upper()}<br/>NEWSLETTER SIGNUP →</div>
+    <img src="images/logo-header.png" alt="{e(SITE["title"])}" width="{round(14*LOGO_RATIO)}" height="14">
+    <p class="t-small">A game by {e(STUDIO["name"])}. Published by {e(SITE["publisher"])}.</p>
+    <p class="t-small">© {year} Levels and Bosses LLC</p>
+    {footer_signup()}
+  </div>
+  <div>{meta("Play", "p")}<ul>
+    <li>{link(SITE["steam_url"], "Steam", cls="")}</li>
+    <li><a href="presskit.html">Press kit</a></li>
+    <li>{link("https://www.youtube.com/watch?v=" + SITE["youtube_id"], "Trailer", cls="")}</li>
+  </ul></div>
+  <div>{meta("Explore", "p")}<ul>
+    <li><a href="exhibitions.html">Exhibitions and playtesting</a></li>
+    <li><a href="devlog.html">Devlog</a></li>
+    <li><a href="merch.html">Merch</a></li>
+  </ul></div>
+  <div>{meta("Follow", "p")}<ul>{follow}</ul>
+    {meta("Contact", "p") if contact else ""}<ul>{contact}</ul></div>
+</div></footer>'''
+
+def trailer_modal():
+    return f'''<div class="modal" id="trailer-modal" data-video="{e(SITE["youtube_id"])}" data-open="false" role="dialog" aria-modal="true" aria-label="Camoflux trailer">
+  <div class="modal__frame">
+    <button class="modal__close btn btn--ghost btn--sm">Close</button>
+    <div class="modal__loading">{meta("Loading trailer")}</div>
+    <iframe title="Camoflux trailer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+  </div>
+</div>'''
+
+def trailer_tile():
+    thumb = f"https://img.youtube.com/vi/{SITE['youtube_id']}/maxresdefault.jpg"
+    return (f'<button class="trailer-tile" data-trailer aria-label="Play the Camoflux trailer">'
+            f'{media(None, src=thumb, alt="Camoflux trailer thumbnail", fallback=img_path("level-one", "main"))}'
+            f'<span class="play" aria-hidden="true">{ICON["play"]}</span></button>')
+
+def newsletter():
+    """Mailchimp signup band. Identical on every page, directly above the footer.
+    With JS: submits via Mailchimp's JSON endpoint and shows submitting / success / error in place.
+    Without JS: a normal POST to Mailchimp in a new tab."""
+    mc = SITE.get("mailchimp")
+    if not mc or not mc.get("action"):
+        return ""
+    return f'''<section class="signup" aria-labelledby="signup-title"><div class="wrap signup__inner">
+  <div class="stack">
+    <h2 class="t-h2" id="signup-title">Studio updates by email</h2>
+    <p class="t-body">News on Camoflux, exhibitions, and new work from Levels & Bosses.</p>
   </div>
   <div>
-    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ PLAY ]</div>
-    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;">
-      <a href="{SITE['steam_url']}" target="_blank">STEAM</a><br/>
-      <a href="presskit.html">PRESS KIT</a><br/>
-      <a href="exhibition.html">EXHIBITION</a>
-    </div>
+    <form class="newsletter" action="{e(mc["action"])}" method="post" target="_blank" novalidate data-mailchimp>
+      <label class="sr-only" for="mce-EMAIL">Email address</label>
+      <input id="mce-EMAIL" type="email" name="EMAIL" required placeholder="Email address" autocomplete="email">
+      <input type="hidden" name="tags" value="{e(mc["tags"])}">
+      <div class="sr-only" aria-hidden="true"><input type="text" name="{e(mc["honeypot"])}" tabindex="-1" value=""></div>
+      <button class="btn btn--primary" type="submit">Subscribe</button>
+    </form>
+    <p class="form-msg t-small" role="status" aria-live="polite"></p>
   </div>
-  <div>
-    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ FOLLOW ]</div>
-    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;">
-      <a href="{SOCIAL['youtube']}" target="_blank">YOUTUBE</a><br/>
-      <a href="{SOCIAL['instagram']}" target="_blank">INSTAGRAM</a><br/>
-      <a href="{SOCIAL['x']}" target="_blank">X / THREADS</a><br/>
-      <a href="{SOCIAL['tiktok']}" target="_blank">TIKTOK</a>
-    </div>
-  </div>
-  <div>
-    <div style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:14px;">[ CONTACT ]</div>
-    <div style="font-size:11px;line-height:2;color:rgba(232,230,223,0.75);letter-spacing:0.05em;"><a href="mailto:{SITE['press_email']}">{SITE['press_email'].upper()}</a></div>
-  </div>
-</footer>"""
+</div></section>'''
 
-
-def reveal_script():
-    return """<script>
-const reveals = document.querySelectorAll('.reveal');
-const io = new IntersectionObserver((entries) => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
-      e.target.classList.add('in');
-      io.unobserve(e.target);
-    }
-  });
-}, { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
-reveals.forEach(el => io.observe(el));
-</script>"""
-
-
-def page_shell(title, body, extra_css="", extra_js="", description=None, preload_hero=True):
-    desc = description or SITE['description_short'].replace('"', '&quot;')
-    preload_tag = '<link rel="preload" as="image" href="images/cavern.jpg" fetchpriority="high">' if preload_hero else ''
-    return f"""<!DOCTYPE html>
+def page_shell(page, title, body, description=None, preload=None, modal=False):
+    desc = e(description or SITE["lead"])
+    base = (SITE.get("base_url") or "").rstrip("/")
+    og = f"{base}/images/og.jpg" if base else "images/og.jpg"
+    pre = f'<link rel="preload" as="image" href="{preload}" fetchpriority="high">' if preload else ""
+    return f'''<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=1280, initial-scale=1">
-<title>{title}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{e(title)}</title>
 <meta name="description" content="{desc}">
+<meta name="theme-color" content="#000000">
 <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="images/favicon-180.png">
-<meta property="og:title" content="{title}">
-<meta property="og:description" content="{desc}">
-<meta property="og:image" content="images/og.jpg">
 <meta property="og:type" content="website">
+<meta property="og:title" content="{e(title)}">
+<meta property="og:description" content="{desc}">
+<meta property="og:image" content="{og}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{title}">
-<meta name="twitter:description" content="{desc}">
-<meta name="twitter:image" content="images/og.jpg">
-{preload_tag}
-{fonts()}
-<style>{SHARED_CSS}{extra_css}</style>
+{pre}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+{adobe_fonts()}
+<link rel="stylesheet" href="assets/site.css">
 </head>
-<body>
+<body{' class="has-ab24"' if SITE["fonts"].get("adobe_kit_id") else ""}>
+{header(page)}
+<main id="main">
 {body}
-{reveal_script()}
-{extra_js}
-</body>
-</html>"""
-
-
-# ---- Page builders ----
-
-def build_homepage():
-    """The main page. With anchor IDs and working nav scroll."""
-    yt_id = SITE['youtube_id']
-    cavern = IMAGES['cavern']
-
-    # Marquee with terms repeated for seamless loop
-    marquee_html = ""
-    for _ in range(2):
-        for term in SITE['marquee_terms']:
-            marquee_html += f'<span>{term}</span><span class="accent">●</span>'
-
-    # Features grid
-    features_html = ""
-    for i, f in enumerate(FEATURES):
-        delay = "transition-delay:0.1s;" if i % 2 == 1 else ""
-        if f['image']:
-            img_inner = f'<div class="img-inner" style="position:absolute;inset:0;background:url({IMAGES_SM[f["image"]]}) center/cover no-repeat;transition:transform 0.8s cubic-bezier(0.2,0.6,0.2,1);"></div>'
-            placeholder = ""
-        else:
-            img_inner = ""
-            placeholder = '<div class="mono" style="font-size:11px;letter-spacing:0.15em;color:rgba(232,230,223,0.5);">[ PROCESS DOCUMENTATION ]</div>'
-
-        bg_style = "" if f['image'] else "background:linear-gradient(135deg,#1a1d20,#2c2f33);"
-        flex_center = "display:flex;align-items:center;justify-content:center;" if not f['image'] else ""
-
-        features_html += f"""
-    <article class="feature-card reveal" style="{delay}">
-      <div class="img-wrap" style="aspect-ratio:16/9;margin-bottom:20px;position:relative;overflow:hidden;{bg_style}{flex_center}">
-        {img_inner}
-        <div class="mono accent" style="position:absolute;top:14px;left:14px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:5px 9px;z-index:2;">{f['tag']}</div>
-        {placeholder}
-      </div>
-      <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">{f['category']}</div>
-      <h3 style="font-size:26px;letter-spacing:-0.025em;margin-bottom:10px;font-weight:500;">{f['title']}</h3>
-      <p style="font-size:15px;color:rgba(232,230,223,0.65);line-height:1.6;">{f['body']}</p>
-    </article>"""
-
-    # Merch teaser — show first 3 items with images
-    merch_with_images = [m for m in MERCH if m.get('image')][:3]
-    merch_teaser_html = ""
-    for i, m in enumerate(merch_with_images):
-        delay = f"transition-delay:{i*0.05}s;" if i > 0 else ""
-        img_url = IMAGES_SM[m['image']]
-        merch_teaser_html += f"""
-    <a href="merch.html" class="merch-card reveal" style="display:block;{delay}">
-      <div class="img-wrap" style="aspect-ratio:1/1;background:url({img_url}) center/cover no-repeat;position:relative;overflow:hidden;margin-bottom:16px;">
-        <div class="img-inner" style="position:absolute;inset:0;background:url({img_url}) center/cover no-repeat;transition:transform 0.8s cubic-bezier(0.2,0.6,0.2,1);"></div>
-        <div class="mono accent" style="position:absolute;top:12px;left:12px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:5px 9px;z-index:2;">{m['category']}</div>
-        <div class="mono" style="position:absolute;bottom:12px;right:12px;font-size:9px;letter-spacing:0.15em;color:rgba(232,230,223,0.85);background:rgba(10,11,13,0.7);padding:5px 9px;z-index:2;">{m['edition']}</div>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-        <h3 style="font-size:18px;letter-spacing:-0.015em;font-weight:500;">{m['name']}</h3>
-        <div class="mono" style="font-size:13px;letter-spacing:0.05em;color:rgba(232,230,223,0.85);">{m['price']}</div>
-      </div>
-      <div class="mono" style="font-size:10px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">{m['format']}</div>
-    </a>"""
-
-    # Press blocks
-    press_top = ""
-    for i, p in enumerate(PRESS_FEATURED):
-        delay = "transition-delay:0.1s;" if i > 0 else ""
-        press_top += f"""
-    <a href="{p['url']}" target="_blank" class="press-quote reveal" style="display:block;background:#14171a;padding:44px 36px;{delay}">
-      <p class="serif-italic" style="font-size:24px;letter-spacing:-0.015em;line-height:1.4;margin-bottom:28px;">"{p['quote']}"</p>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:20px;border-top:0.5px solid rgba(232,230,223,0.15);" class="mono">
-        <span style="font-size:11px;letter-spacing:0.12em;">{p['source']}</span>
-        <span style="font-size:10px;color:rgba(232,230,223,0.5);" class="press-meta">{p['date']} · READ →</span>
-      </div>
-    </a>"""
-
-    press_short = ""
-    for i, p in enumerate(PRESS_SHORT):
-        delay = f"transition-delay:{i*0.05+0.05}s;" if i > 0 else ""
-        press_short += f"""
-    <a href="{p['url']}" target="_blank" class="press-quote reveal" style="display:block;background:#14171a;padding:32px 36px;{delay}">
-      <p class="serif-italic" style="font-size:17px;letter-spacing:-0.01em;line-height:1.45;margin-bottom:18px;">"{p['quote']}"</p>
-      <div class="mono" style="font-size:10px;letter-spacing:0.12em;padding-top:14px;border-top:0.5px solid rgba(232,230,223,0.15);display:flex;justify-content:space-between;">
-        <span>{p['source']}</span>
-        <span class="press-meta" style="color:rgba(232,230,223,0.5);">READ →</span>
-      </div>
-    </a>"""
-
-    extra_css = """
-.feature-card{transition:transform 0.4s cubic-bezier(0.2,0.6,0.2,1)}
-.feature-card:hover{transform:translateY(-6px)}
-.feature-card .img-wrap{transition:filter 0.4s ease}
-.feature-card:hover .img-wrap{filter:brightness(1.08)}
-.feature-card:hover .img-inner{transform:scale(1.05)}
-.play-btn{transition:transform 0.3s ease, background 0.3s ease}
-.trailer-link:hover .play-btn{transform:scale(1.1);background:rgba(216,255,58,0.2)}
-.trailer-link .img-zoom{transition:transform 0.8s cubic-bezier(0.2,0.6,0.2,1)}
-.trailer-link:hover .img-zoom{transform:scale(1.04)}
-.press-quote{transition:background 0.3s ease, transform 0.3s ease}
-.press-quote:hover{background:#1a1d20;transform:translateY(-3px)}
-.press-quote:hover .press-meta{color:#d8ff3a}
-.press-meta{transition:color 0.25s ease}
-.merch-card{transition:transform 0.4s cubic-bezier(0.2,0.6,0.2,1)}
-.merch-card:hover{transform:translateY(-6px)}
-.merch-card .img-wrap{transition:filter 0.4s ease}
-.merch-card:hover .img-wrap{filter:brightness(1.08)}
-.merch-card:hover .img-inner{transform:scale(1.05)}
-.modal-overlay{position:fixed;inset:0;background:rgba(10,11,13,0.92);display:none;align-items:center;justify-content:center;z-index:1000;opacity:0;transition:opacity 0.3s ease}
-.modal-overlay.open{display:flex;opacity:1}
-.modal-frame{width:80vw;max-width:1280px;aspect-ratio:16/9;position:relative}
-.modal-close{position:absolute;top:-44px;right:0;color:#e8e6df;font-size:14px;letter-spacing:0.15em;cursor:pointer;font-family:'JetBrains Mono',monospace;background:none;border:none}
-"""
-
-    extra_js = f"""<script>
-const modal = document.getElementById('trailer-modal');
-const iframe = document.getElementById('trailer-iframe');
-const openBtn = document.getElementById('open-trailer');
-const trailerBlock = document.getElementById('trailer-block');
-const closeBtn = document.getElementById('close-trailer');
-function openTrailer(e){{
-  if (e) e.preventDefault();
-  iframe.src = 'https://www.youtube.com/embed/{yt_id}?autoplay=1&rel=0';
-  modal.classList.add('open');
-  document.body.style.overflow = 'hidden';
-}}
-function closeTrailer(){{
-  iframe.src = '';
-  modal.classList.remove('open');
-  document.body.style.overflow = '';
-}}
-openBtn.addEventListener('click', openTrailer);
-trailerBlock.addEventListener('click', openTrailer);
-closeBtn.addEventListener('click', closeTrailer);
-modal.addEventListener('click', (e) => {{ if (e.target === modal) closeTrailer(); }});
-document.addEventListener('keydown', (e) => {{ if (e.key === 'Escape') closeTrailer(); }});
-</script>"""
-
-    body = f"""{header(active="world")}
-
-<section id="world" style="position:relative;height:680px;overflow:hidden;">
-  <div class="hero-bg" style="background:url({cavern}) center/cover no-repeat;"></div>
-  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,11,13,0.55) 0%,rgba(10,11,13,0.15) 30%,rgba(10,11,13,0.45) 70%,rgba(10,11,13,0.95) 100%);"></div>
-  <div style="position:absolute;top:32px;left:48px;right:48px;display:flex;justify-content:space-between;font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.65);" class="mono">
-    <div>[ INCENDIO IGAPÓ // PART_01 ]</div>
-    <div style="display:flex;gap:28px;">
-      <span class="accent status-live">● REC</span>
-    </div>
-  </div>
-  <div class="corner" style="top:24px;left:40px;border-left:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="top:24px;right:40px;border-right:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:24px;left:40px;border-left:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:24px;right:40px;border-right:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div style="position:absolute;bottom:80px;left:48px;right:48px;">
-    <div class="mono reveal" style="font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.6);margin-bottom:20px;">AN EPISODIC EXPLORATION GAME · {SITE['release'].split()[0]}</div>
-    <h1 class="reveal" style="font-size:88px;line-height:0.95;letter-spacing:-0.04em;font-weight:500;max-width:1000px;margin-bottom:24px;transition-delay:0.1s;">{SITE['tagline']}</h1>
-    <p class="reveal" style="font-size:16px;line-height:1.55;color:rgba(232,230,223,0.78);max-width:520px;margin-bottom:32px;transition-delay:0.2s;">{SITE['description_short']}</p>
-    <div class="reveal" style="display:flex;gap:14px;align-items:center;transition-delay:0.3s;">
-      <a href="{SITE['steam_url']}" target="_blank" class="btn-primary">WISHLIST ON STEAM →</a>
-      <button class="btn-secondary" id="open-trailer">
-        <div class="play-arrow" style="width:0;height:0;border-left:6px solid #e8e6df;border-top:4px solid transparent;border-bottom:4px solid transparent;"></div>
-        WATCH TRAILER
-      </button>
-    </div>
-  </div>
-</section>
-
-{status_bar()}
-
-<section style="padding:32px 48px;background:#0f1012;border-bottom:0.5px solid rgba(232,230,223,0.08);display:grid;grid-template-columns:240px 1fr auto;gap:36px;align-items:center;">
-  <div>
-    <div class="section-label" style="margin-bottom:6px;">[ NOW SHOWING ]</div>
-    <div style="font-size:18px;letter-spacing:-0.01em;font-weight:500;">{EXHIBITION['subtitle']}</div>
-  </div>
-  <div class="serif-italic" style="font-size:15px;color:rgba(232,230,223,0.75);line-height:1.55;">"{EXHIBITION['press_quote']}"</div>
-  <a href="exhibition.html" class="mono" style="font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.5);text-align:right;">
-    <div>{EXHIBITION['dates'].replace(', 2026','').upper()}</div>
-    <div class="accent" style="margin-top:4px;">VISIT →</div>
-  </a>
-</section>
-
-<section class="marquee-wrap" style="padding:20px 0;background:#0a0b0d;border-bottom:0.5px solid rgba(232,230,223,0.08);">
-  <div class="marquee mono" style="font-size:13px;letter-spacing:0.15em;color:rgba(232,230,223,0.45);">
-    {marquee_html}
-  </div>
-</section>
-
-<section style="padding:120px 48px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
-    <div class="section-label reveal" style="padding-top:14px;">[ PART_01 ]</div>
-    <div>
-      <h2 class="reveal" style="font-size:48px;letter-spacing:-0.03em;line-height:1.05;font-weight:500;margin-bottom:28px;max-width:780px;">You are <em>The Other</em>.</h2>
-      <p class="reveal" style="font-size:17px;line-height:1.7;color:rgba(232,230,223,0.7);max-width:680px;transition-delay:0.1s;">A third-person ontology where landscapes, bodies, and technology fuse. Adapt to shifting conditions through vibrational terraforming, camouflage, and electromagnetic sensors. Solve environmental puzzles. Choose to destroy bosses — or engage with them.</p>
-    </div>
-  </div>
-</section>
-
-<section id="features" style="padding:0 48px 120px;scroll-margin-top:80px;">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:36px;" class="mono">
-    <div class="section-label">[ FEATURES ]</div>
-    <div style="font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.4);">{len(FEATURES):02d} SYSTEMS</div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
-    {features_html}
-  </div>
-</section>
-
-<section id="trailer" style="padding:0 48px 120px;scroll-margin-top:80px;">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:28px;" class="mono">
-    <div class="section-label">[ TRAILER ]</div>
-    <div style="font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.4);">{SITE['trailer_duration']} · 4K</div>
-  </div>
-  <a href="https://www.youtube.com/watch?v={yt_id}" target="_blank" id="trailer-block" class="trailer-link reveal" style="position:relative;aspect-ratio:16/9;overflow:hidden;display:block;">
-    <div class="img-zoom" style="position:absolute;inset:0;background:url({YT_THUMB}) center/cover no-repeat;"></div>
-    <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(10,11,13,0.7) 100%);"></div>
-    <div class="mono" style="position:absolute;top:18px;left:18px;right:18px;display:flex;justify-content:space-between;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.7);">
-      <span class="accent status-live">● LIVE FEED</span>
-      <span>YT://{yt_id}</span>
-    </div>
-    <div class="play-btn" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:88px;height:88px;border:1px solid rgba(232,230,223,0.85);border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(10,11,13,0.4);">
-      <div style="width:0;height:0;border-left:22px solid #e8e6df;border-top:13px solid transparent;border-bottom:13px solid transparent;margin-left:6px;"></div>
-    </div>
-    <div class="mono" style="position:absolute;bottom:20px;left:18px;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.7);">CAMOFLUX_TRAILER_2024.mp4</div>
-  </a>
-</section>
-
-<section id="press" style="padding:120px 48px;background:#14171a;scroll-margin-top:80px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:64px;">
-    <div class="section-label reveal" style="padding-top:14px;">[ PRESS ]</div>
-    <h2 class="reveal" style="font-size:34px;letter-spacing:-0.025em;line-height:1.2;max-width:760px;font-weight:400;">Critics on the practice — from gallery to game engine.</h2>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(232,230,223,0.1);margin-bottom:1px;">
-    {press_top}
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:rgba(232,230,223,0.1);">
-    {press_short}
-  </div>
-  <div style="margin-top:32px;text-align:right;">
-    <a href="presskit.html" class="mono" style="font-size:11px;letter-spacing:0.15em;color:#d8ff3a;">FULL PRESS KIT →</a>
-  </div>
-</section>
-
-<section id="studio" style="padding:120px 48px;scroll-margin-top:80px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
-    <div class="section-label reveal" style="padding-top:14px;">[ STUDIO ]</div>
-    <div>
-      <h2 class="reveal" style="font-size:38px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:22px;">{STUDIO['name']}</h2>
-      <p class="reveal" style="font-size:16px;color:rgba(232,230,223,0.72);line-height:1.65;max-width:620px;margin-bottom:28px;transition-delay:0.1s;">{STUDIO['blurb_short']}</p>
-      <a href="#" class="mono accent reveal" style="font-size:11px;letter-spacing:0.12em;display:inline-block;transition-delay:0.2s;">ABOUT THE STUDIO →</a>
-    </div>
-  </div>
-</section>
-
-<section style="padding:0 48px 120px;">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:36px;" class="mono">
-    <div class="section-label reveal">[ MERCH ]</div>
-    <a href="merch.html" class="reveal" style="font-size:11px;letter-spacing:0.15em;color:#d8ff3a;">SHOP ALL →</a>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;">
-    {merch_teaser_html}
-  </div>
-</section>
-
-<section style="position:relative;padding:160px 48px;text-align:center;overflow:hidden;">
-  <div class="hero-bg" style="background:url({cavern}) center/cover no-repeat;animation-duration:32s;"></div>
-  <div style="position:absolute;inset:0;background:rgba(10,11,13,0.78);"></div>
-  <div class="corner" style="top:32px;left:48px;border-left:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="top:32px;right:48px;border-right:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:32px;left:48px;border-left:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:32px;right:48px;border-right:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div style="position:relative;">
-    <div class="mono reveal" style="font-size:11px;letter-spacing:0.22em;color:rgba(232,230,223,0.55);margin-bottom:28px;">[ TRANSMISSION ENDS · {SITE['release'].split()[0]} ]</div>
-    <h2 class="reveal" style="font-size:80px;letter-spacing:-0.035em;line-height:1;margin-bottom:28px;font-weight:500;transition-delay:0.1s;">Wishlist now.</h2>
-    <p class="reveal" style="font-size:16px;color:rgba(232,230,223,0.7);margin-bottom:40px;max-width:520px;margin-left:auto;margin-right:auto;transition-delay:0.2s;">Get notified the moment Camoflux releases on Steam.</p>
-    <a href="{SITE['steam_url']}" target="_blank" class="btn-primary reveal" style="padding:16px 34px;font-size:13px;transition-delay:0.3s;">WISHLIST ON STEAM →</a>
-  </div>
-</section>
-
+</main>
 {footer()}
+{trailer_modal() if modal else ""}
+<script src="assets/site.js" defer></script>
+{hero3d_scripts() if page == "index" else ""}
+</body>
+</html>'''
 
-<div class="modal-overlay" id="trailer-modal">
-  <div class="modal-frame">
-    <button class="modal-close" id="close-trailer">[ CLOSE × ]</button>
-    <iframe id="trailer-iframe" width="100%" height="100%" src="" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-  </div>
-</div>"""
+def adobe_fonts():
+    kit = SITE["fonts"].get("adobe_kit_id")
+    if not kit:
+        return ""
+    fam = SITE["fonts"]["adobe_meta_family"]
+    return f'<link rel="stylesheet" href="https://use.typekit.net/{e(kit)}.css"><style>:root {{ --f-mono: "{e(fam)}", "Share Tech Mono", ui-monospace, monospace; }}</style>'
 
-    return page_shell(f"{SITE['title']} — {SITE['subtitle']}", body, extra_css=extra_css, extra_js=extra_js)
+# Footage on the screen behind the model. "clip:" entries are looping MP4s made from the gameplay GIFs.
+HERO_FRAMES = [("clip:amazon", "Amazon, in-game render"), ("clip:first-boss", "The First-Boss, Level One"),
+               ("clip:level-one", "Level One"), ("clip:paramo", "Patterned Páramo")]
 
+def hero3d_scripts():
+    """Loads three.js and the hero only after the page is up, and only where it makes sense."""
+    h = SITE.get("hero3d") or {}
+    if not h.get("enabled"):
+        return ""
+    colors = _json.loads((ROOT / "assets/3d/frames/colors.json").read_text())
+    def frame(k, c):
+        if k.startswith("clip:"):
+            n = k[5:]
+            d = {"src": f"assets/3d/clips/{n}.jpg", "video": f"assets/3d/clips/{n}.mp4", "caption": c, "color": colors.get("clip-" + n, colors.get(n, "#1f4a33"))}
+            if (ROOT / f"assets/3d/clips/{n}.webm").exists():
+                d["webm"] = f"assets/3d/clips/{n}.webm"
+            return d
+        return {"src": f"assets/3d/frames/{k}.jpg", "caption": c, "color": colors[k]}
+    def model(m):
+        d = {k: v for k, v in m.items() if k not in ("id", "file")}
+        d["src"] = f"assets/3d/{m['file']}"
+        q = m["file"].replace(".glb", ".q.glb")
+        if (ROOT / "assets/3d" / q).exists():
+            d["fallback"] = f"assets/3d/{q}"
+        return d
+    models = {m["id"]: model(m) for m in h["models"]}
+    # Homepage hero: floating level icons (hover for each level's 360, hold to look around),
+    # particles that open into screenshots, The Other cycling its shape keys. See assets/hero3d-levels.js.
+    lv = SITE["hero_levels"]
+    cfg = {
+        "icons": [{"id": x["id"], "label": x["label"], "src": f"assets/3d/{x['model']}", "height": x["height"],
+                   "pano": f"assets/3d/pano/{x['pano']}.mp4", "panoPoster": f"assets/3d/pano/{x['pano']}.jpg"} for x in lv["icons"]],
+        "figure": {"label": "The Other", "src": f"assets/3d/{lv['figure']}", "scale": 1.25, "lie": False},
+        "tex": {"void": "assets/3d/void.jpg", "voidN": "assets/3d/void-n.jpg", "ground": "assets/3d/ground.jpg", "groundN": "assets/3d/ground-n.jpg"},
+        "shots": [{"src": img_path(k, "sm"), "caption": IMAGES[k]["caption"]} for k in lv["shots"]],
+    }
+    for f in [*(x["src"] for x in cfg["icons"]), *(x["pano"] for x in cfg["icons"]), *(x["panoPoster"] for x in cfg["icons"]), cfg["figure"]["src"], *cfg["tex"].values()]:
+        if not (ROOT / f).exists():
+            ERRORS.append(f"3D hero asset missing: {f}")
+    libs = ["https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js",
+            "https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js",
+            "https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/libs/meshopt_decoder.js",
+            "assets/hero3d-levels.js"]
+    return f'''<script>window.CAMOFLUX_LEVELS = {_json.dumps(cfg, ensure_ascii=False)};
+(function () {{
+  var hero = document.getElementById('hero');
+  var saveData = navigator.connection && navigator.connection.saveData;
+  var gl = (function () {{ try {{ var c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }} catch (e) {{ return false; }} }})();
+  if (!hero || saveData || !gl) {{ if (hero) hero.classList.add('is-still'); return; }}
+  var libs = {_json.dumps(libs)};
+  var next = function (i) {{ if (i >= libs.length) return; var s = document.createElement('script');
+    var inline = libs[i].indexOf('inline:') === 0 && document.getElementById(libs[i].slice(7));
+    if (inline) {{ s.textContent = inline.textContent; document.body.appendChild(s); return next(i + 1); }}
+    s.src = libs[i];
+    s.onload = function () {{ next(i + 1); }}; s.onerror = function () {{ hero.classList.add('is-still'); }}; document.body.appendChild(s); }};
+  window.addEventListener('load', function () {{ next(0); }});
+}})();
+</script>'''
 
-def build_devlog_index():
-    """Devlog list page."""
-    posts_html = ""
-    for i, post in enumerate(DEVLOG):
-        delay = f"transition-delay:{(i % 3) * 0.05}s;"
-        img_style = ""
-        if post.get('image'):
-            img_style = f"background:url({IMAGES_SM[post['image']]}) center/cover no-repeat;"
-        else:
-            img_style = "background:linear-gradient(135deg,#1a1d20,#2c2f33);"
+def page_head(label, title, lead="", actions=""):
+    return (f'<section class="page-head"><div class="wrap"><div class="panel">{meta(label)}'
+            f'<h1 class="t-h1">{e(title)}</h1>'
+            + (f'<p class="t-lead">{e(lead)}</p>' if lead else "")
+            + (f'<div class="actions page-head__actions">{actions}</div>' if actions else "")
+            + '</div></div></section>')
 
-        date_iso = post['date']
-        date_display = date_iso.replace("-", ".")
+# ---------------------------------------------------------------- blocks
 
-        posts_html += f"""
-    <a href="devlog-{post['id']}.html" class="devlog-card reveal" style="display:block;{delay}">
-      <div class="img-wrap" style="aspect-ratio:16/9;{img_style}position:relative;overflow:hidden;margin-bottom:18px;">
-        <div class="mono accent" style="position:absolute;top:14px;left:14px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:5px 9px;z-index:2;">{post['category']}</div>
-        <div class="img-inner" style="position:absolute;inset:0;{img_style}transition:transform 0.8s cubic-bezier(0.2,0.6,0.2,1);"></div>
-      </div>
-      <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">{date_display}</div>
-      <h3 style="font-size:22px;letter-spacing:-0.02em;line-height:1.25;margin-bottom:10px;font-weight:500;">{post['title']}</h3>
-      <p style="font-size:14px;color:rgba(232,230,223,0.65);line-height:1.55;margin-bottom:14px;">{post['excerpt']}</p>
-      <span class="mono accent read-more" style="font-size:10px;letter-spacing:0.15em;">READ →</span>
-    </a>"""
+def quote_card(q, small=False):
+    who = ", ".join(x for x in (q["source"], q.get("author"), q.get("date")) if x)
+    return (f'<a class="quote{" quote--sm" if small else ""}" href="{e(q["url"])}" target="_blank" rel="noopener">'
+            f'<p class="t-quote">“{e(q["quote"])}”</p>'
+            f'<footer>{meta(who, "p")}{meta("Read ↗", cls="ext-label")}</footer>'
+            f'<span class="sr-only"> (opens in a new tab)</span></a>')
 
-    extra_css = """
-.devlog-card{transition:transform 0.4s cubic-bezier(0.2,0.6,0.2,1)}
-.devlog-card:hover{transform:translateY(-4px)}
-.devlog-card .img-wrap{transition:filter 0.4s ease}
-.devlog-card:hover .img-wrap{filter:brightness(1.08)}
-.devlog-card:hover .img-inner{transform:scale(1.05)}
-.devlog-card:hover .read-more{color:#d8ff3a}
-"""
+def coverage_block(groups=None):
+    out = ""
+    for title, items in COVERAGE.items():
+        if groups and title not in groups:
+            continue
+        links = "".join(f'<li>{link(u, n, cls="")}</li>' for n, u in items)
+        out += f'<div class="coverage">{meta(title, "p")}<ul class="coverage__list">{links}</ul></div>'
+    return out
 
-    body = f"""{header(active="devlog")}
+def press_block():
+    top = rail("quotes quotes--2", "".join(quote_card(q) for q in PRESS_FEATURED), "Featured press")
+    rest = rail("quotes quotes--3", "".join(quote_card(q, small=True) for q in PRESS_SHORT), "More press")
+    return f'<div class="stack-lg">{top}{rest}</div>'
 
-<section style="padding:80px 48px 40px;border-bottom:0.5px solid rgba(232,230,223,0.1);">
-  <div class="mono reveal" style="font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.5);margin-bottom:18px;">[ DEVLOG · {len(DEVLOG):02d} ENTRIES ]</div>
-  <h1 class="reveal" style="font-size:88px;line-height:0.95;letter-spacing:-0.04em;font-weight:500;margin-bottom:28px;max-width:1100px;transition-delay:0.1s;">Notes from the build.</h1>
-  <p class="reveal" style="font-size:17px;line-height:1.6;color:rgba(232,230,223,0.7);max-width:680px;transition-delay:0.2s;">Process documentation, exhibition reports, and writing about the practice. New entries published as they happen.</p>
-</section>
+def feature_card(f):
+    return (f'<article class="card">{media(f["image"])}'
+            f'{meta(f["category"])}<h3 class="t-h3">{e(f["title"])}</h3>'
+            f'<p class="t-small">{e(f["body"])}</p></article>')
 
-{status_bar()}
+def biome_card(i, b):
+    head = f'{meta(f"{i:02d}", cls="accent")}<h3 class="t-h3">{e(b["name"])}</h3><p class="t-small">{e(b["body"])}</p>'
+    if b.get("image"):
+        return f'<article class="card card--step">{media(b["image"], ar="4x3")}{head}</article>'
+    return f'<article class="card card--text card--step">{head}</article>'
 
-<section style="padding:96px 48px;">
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:40px;">
-    {posts_html}
-  </div>
-</section>
+def facts_bar():
+    items = [("Status", SITE["status"]), ("Platform", SITE["platform"]), ("Engine", SITE["engine"]), ("Release", SITE["release"])]
+    cells = "".join(f'<div><dt class="t-meta">{e(k)}</dt><dd>{e(v)}</dd></div>' for k, v in items)
+    return f'<div class="wrap"><dl class="facts">{cells}</dl></div>'
 
-{footer()}"""
+def exhibition_rows():
+    rows = ""
+    for x in EXHIBITIONS["upcoming"][:3]:
+        rows += (f'<a class="row" href="exhibitions.html#upcoming"><div>{meta("Upcoming")}'
+                 f'<h3 class="t-h3">{e(x["title"])}</h3><p class="t-small">{e(x["venue"])}</p></div>{meta(x["dates"])}</a>')
+    f = EXHIBITIONS["featured"]
+    rows += (f'<a class="row" href="exhibitions.html#whitney"><div>{meta("Exhibited")}'
+             f'<h3 class="t-h3">{e(f["title"])}</h3><p class="t-small">{e(f["venue"])}</p></div>{meta("2026")}</a>')
+    return f'<div class="rows">{rows}</div>'
 
-    return page_shell(f"Devlog — {SITE['title']}", body, extra_css=extra_css)
+def merch_card(m):
+    available = m["status"] == "available" and m.get("url")
+    badge = "Available" if available else "In production"
+    buy = btn(m["url"], f"Buy {m['price']}" if m.get("price") else "Buy", size="sm") if available else ""
+    details = f'<p class="t-small">{e(m["details"])}</p>' if m.get("details") else ""
+    return (f'<article class="card">{media(m["image"], ar="1x1", badge=badge)}'
+            f'{meta(m["category"])}<h3 class="t-h3">{e(m["name"])}</h3>{details}{buy}</article>')
 
+def devlog_card(p):
+    head = (f'<time class="t-meta" datetime="{p["date"]}">{fmt_date(p["date"])}</time>'
+            f'<h3 class="t-h3">{e(p["title"])}</h3><p class="t-small">{e(p["excerpt"])}</p>')
+    if p.get("image"):
+        return f'<a class="card" href="devlog-{p["id"]}.html">{media(p["image"], badge=p["category"])}{head}</a>'
+    return f'<a class="card card--text" href="devlog-{p["id"]}.html">{meta(p["category"])}{head}</a>'
 
-def build_devlog_post(post):
-    """Individual devlog post page."""
-    img_url = IMAGES[post['image']] if post.get('image') else None
-    body_html = "".join(f'<p style="font-size:17px;line-height:1.75;color:rgba(232,230,223,0.85);margin-bottom:24px;">{para}</p>' for para in post['body'])
+# ---------------------------------------------------------------- pages
 
-    # Find prev/next posts
-    idx = next(i for i, p in enumerate(DEVLOG) if p['id'] == post['id'])
-    prev_post = DEVLOG[idx - 1] if idx > 0 else None
-    next_post = DEVLOG[idx + 1] if idx < len(DEVLOG) - 1 else None
-
-    nav_html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:64px;padding-top:48px;border-top:0.5px solid rgba(232,230,223,0.15);">'
-    if prev_post:
-        nav_html += f'<a href="devlog-{prev_post["id"]}.html" style="display:block;"><div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:8px;">← NEWER</div><div style="font-size:16px;letter-spacing:-0.01em;font-weight:500;">{prev_post["title"]}</div></a>'
-    else:
-        nav_html += '<div></div>'
-    if next_post:
-        nav_html += f'<a href="devlog-{next_post["id"]}.html" style="display:block;text-align:right;"><div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:8px;">OLDER →</div><div style="font-size:16px;letter-spacing:-0.01em;font-weight:500;">{next_post["title"]}</div></a>'
-    else:
-        nav_html += '<div></div>'
-    nav_html += '</div>'
-
-    hero_img_html = ""
-    if img_url:
-        hero_img_html = f"""
-<section style="padding:0 48px 48px;">
-  <div style="aspect-ratio:21/9;background:url({img_url}) center/cover no-repeat;position:relative;">
-    <div class="mono" style="position:absolute;bottom:16px;left:16px;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.7);background:rgba(10,11,13,0.5);padding:6px 10px;">DEVLOG_{post['id'].upper()}_HERO.JPG</div>
-  </div>
-</section>"""
-
-    date_display = post['date'].replace("-", ".")
-
-    body = f"""{header(active="devlog")}
-
-<section style="padding:80px 48px 48px;">
-  <div class="mono reveal" style="display:flex;gap:24px;font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:24px;">
-    <span><a href="devlog.html" class="accent">← DEVLOG</a></span>
-    <span>{date_display}</span>
-    <span class="accent">{post['category']}</span>
-  </div>
-  <h1 class="reveal" style="font-size:64px;line-height:1.0;letter-spacing:-0.035em;font-weight:500;margin-bottom:24px;max-width:1000px;transition-delay:0.1s;">{post['title']}</h1>
-  <p class="reveal" style="font-size:18px;line-height:1.55;color:rgba(232,230,223,0.7);max-width:720px;font-style:italic;font-family:Georgia,serif;transition-delay:0.2s;">{post['excerpt']}</p>
-</section>
-
-{hero_img_html}
-
-<article style="padding:48px 48px 96px;max-width:780px;margin:0 auto;">
-  {body_html}
-  {nav_html}
-</article>
-
-{footer()}"""
-
-    return page_shell(f"{post['title']} — Devlog", body)
-
-
-def build_exhibition():
-    """Whitney exhibition page."""
-    works_html = ""
-    for i, w in enumerate(EXHIBITION['works']):
-        img_url = IMAGES.get(w['image']) if w.get('image') else None
-        img_style = f"background:url({img_url}) center/cover no-repeat;" if img_url else "background:linear-gradient(135deg,#1a1d20,#2c2f33);"
-
-        layout = "1fr 1.2fr" if i % 2 == 0 else "1.2fr 1fr"
-        order_text = "" if i % 2 == 0 else "order:2;"
-        order_img = "" if i % 2 == 0 else "order:1;"
-
-        works_html += f"""
-    <article class="reveal" style="display:grid;grid-template-columns:{layout};gap:48px;align-items:center;margin-bottom:96px;">
-      <div style="{order_text}">
-        <div class="mono accent" style="font-size:10px;letter-spacing:0.22em;margin-bottom:14px;">WORK_{i+1:02d}</div>
-        <h3 style="font-size:32px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:8px;">{w['title']}</h3>
-        <div class="mono" style="font-size:11px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);margin-bottom:18px;">{w['year']} · {w['media']}</div>
-        <p style="font-size:15px;color:rgba(232,230,223,0.72);line-height:1.65;">{w['description']}</p>
-      </div>
-      <div style="aspect-ratio:4/3;{img_style}position:relative;{order_img}">
-        <div class="mono" style="position:absolute;bottom:14px;left:14px;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.7);background:rgba(10,11,13,0.5);padding:6px 10px;">{w['title'].upper()[:40]}</div>
-      </div>
-    </article>"""
-
-    cavern = IMAGES['cavern']
-
-    body = f"""{header(active="world")}
-
-<section style="position:relative;height:520px;overflow:hidden;">
-  <div class="hero-bg" style="background:url({cavern}) center/cover no-repeat;"></div>
-  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,11,13,0.55) 0%,rgba(10,11,13,0.25) 30%,rgba(10,11,13,0.5) 70%,rgba(10,11,13,0.95) 100%);"></div>
-  <div style="position:absolute;top:32px;left:48px;right:48px;display:flex;justify-content:space-between;font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.65);" class="mono">
-    <div>[ EXHIBITION // WHITNEY BIENNIAL 2026 ]</div>
-    <div class="accent status-live">● ON VIEW</div>
-  </div>
-  <div class="corner" style="top:24px;left:40px;border-left:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="top:24px;right:40px;border-right:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:24px;left:40px;border-left:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:24px;right:40px;border-right:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div style="position:absolute;bottom:64px;left:48px;right:48px;">
-    <div class="mono reveal" style="font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.7);margin-bottom:18px;">{EXHIBITION['subtitle']} · {EXHIBITION['dates'].upper()}</div>
-    <h1 class="reveal" style="font-size:80px;line-height:0.95;letter-spacing:-0.04em;font-weight:500;max-width:1000px;transition-delay:0.1s;">{EXHIBITION['title']}</h1>
-  </div>
-</section>
-
-<section style="padding:18px 48px;background:#14171a;display:grid;grid-template-columns:repeat(4,1fr);gap:32px;font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.65);border-bottom:0.5px solid rgba(232,230,223,0.08);" class="mono">
-  <div><span class="accent">VENUE</span><br/><span style="color:#e8e6df;font-size:11px;letter-spacing:0.05em;">{EXHIBITION['venue']}</span></div>
-  <div><span class="accent">FLOOR</span><br/><span style="color:#e8e6df;font-size:11px;letter-spacing:0.05em;">{EXHIBITION['floor']}</span></div>
-  <div><span class="accent">CURATORS</span><br/><span style="color:#e8e6df;font-size:11px;letter-spacing:0.05em;">{EXHIBITION['curators']}</span></div>
-  <div><span class="accent">DATES</span><br/><span style="color:#e8e6df;font-size:11px;letter-spacing:0.05em;">{EXHIBITION['dates']}</span></div>
-</section>
-
-<section style="padding:96px 48px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
-    <div class="section-label reveal" style="padding-top:14px;">[ ABOUT ]</div>
-    <p class="reveal" style="font-size:21px;line-height:1.55;color:rgba(232,230,223,0.85);max-width:760px;font-weight:400;letter-spacing:-0.01em;transition-delay:0.1s;">{EXHIBITION['intro']}</p>
-  </div>
-</section>
-
-<section style="padding:0 48px 96px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:48px;">
-    <div class="section-label reveal" style="padding-top:14px;">[ WORKS ON VIEW ]</div>
-    <div class="mono reveal" style="font-size:11px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">03 INSTALLATIONS</div>
-  </div>
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
-    <div></div>
-    <div>
-      {works_html}
+def build_index():
+    hero_img = img_path(SITE["hero_image"], "main")
+    check_image(SITE["hero_image"])
+    hero = f'''<section class="hero hero--3d" id="hero" aria-label="{e(SITE["full_title"])}">
+  <div class="hero__poster" role="img" aria-label="{e(IMAGES[SITE["hero_image"]]["alt"])}" style="background-image:url({hero_img})"></div>
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <div class="hero__progress" id="progress"></div>
+  <p class="sr-only" id="status" role="status"></p>
+  <p class="level-label t-meta" id="level-label" data-show="false" aria-hidden="true"></p>
+  <div class="hero__keys"><button class="btn btn--ghost btn--sm" data-hero-next>Show the next model</button><button class="btn btn--ghost btn--sm" data-hero-shot>View the footage larger</button></div>
+  <div class="hero__body seq">
+    <h1 style="--i:0"><img class="hero__logo" src="images/logo.png" alt="{e(SITE["full_title"])}" width="880" height="{round(880/LOGO_RATIO)}"></h1>
+    <p class="t-lead" style="--i:1">{e(SITE["lead"])}</p>
+    <div class="actions" style="--i:2">
+      {btn(SITE["steam_url"], "Wishlist on Steam")}
+      <button class="btn btn--ghost" data-trailer>{ICON["play"]}Watch trailer</button>
     </div>
   </div>
 </section>
+<div class="shotbox" id="shotbox" data-open="false" role="dialog" aria-modal="true" aria-label="Game footage">
+  <div class="shotbox__frame"><button class="shotbox__close btn btn--ghost btn--sm">Close</button><div class="shotbox__stage"></div><p class="shotbox__cap t-meta"></p></div>
+</div>'''
 
-<section style="padding:96px 48px;background:#14171a;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;align-items:center;">
-    <div class="section-label reveal">[ PRESS ]</div>
-    <div>
-      <blockquote class="reveal" style="margin:0;">
-        <p class="serif-italic" style="font-size:32px;letter-spacing:-0.02em;line-height:1.35;margin-bottom:28px;">"{EXHIBITION['press_quote']}"</p>
-        <footer style="display:flex;justify-content:space-between;align-items:center;padding-top:20px;border-top:0.5px solid rgba(232,230,223,0.15);" class="mono">
-          <cite style="font-size:11px;letter-spacing:0.12em;font-style:normal;">{EXHIBITION['press_source'].upper()}</cite>
-          <a href="{EXHIBITION['press_url']}" target="_blank" class="accent" style="font-size:11px;letter-spacing:0.12em;">READ FULL ARTICLE →</a>
-        </footer>
-      </blockquote>
-    </div>
-  </div>
-</section>
+    biomes = "".join(biome_card(i + 1, b) for i, b in enumerate(WORLD["biomes"]))
+    world = section(split("World", f'<div class="stack-lg"><h2 class="t-h2">{e(WORLD["heading"])}</h2>{prose(WORLD["body"])}'
+                                   f'<div class="grid grid--2">{biomes}</div></div>'), id_="world")
+    features = section(row_head("Features") + f'<div class="grid grid--{3 if len(FEATURES) == 3 else 2}">' + "".join(feature_card(f) for f in FEATURES) + "</div>", id_="features")
+    sketch = "".join(f'<figure class="sketch">{media(k, ar="4x3", size="main")}<figcaption class="t-meta">{acc(e(ARTWORK[k]["caption"]))}</figcaption></figure>' for k in SKETCHBOOK[:3])
+    def clip(n, cap):
+        return (f'<figure class="clip-fig"><div class="media ar-2x1 clip-wrap"><video class="clip" muted loop playsinline preload="none" poster="assets/3d/clips/{n}.jpg" aria-label="{e(cap)}">'
+                + (f'<source src="assets/3d/clips/{n}.webm" type="video/webm">' if (ROOT / f"assets/3d/clips/{n}.webm").exists() else "")
+                + f'<source src="assets/3d/clips/{n}.mp4" type="video/mp4"></video></div><figcaption class="t-meta">{acc(e(cap))}</figcaption></figure>')
+    wide = GAMEPLAY.get("wide")
+    inplay = section(row_head("In play", meta("Captured in the game")) + '<div class="grid grid--2">' + "".join(clip(n, c) for n, c in GAMEPLAY["clips"]) + "</div>"
+                     + (f'<figure class="wide-fig">{media(wide, ar="wide", size="main")}<figcaption class="t-meta">{acc(e(IMAGES[wide]["caption"]))}</figcaption></figure>' if wide else ""), id_="gameplay")
+    sketchbook = section(row_head("From the sketchbook", meta("Drawings behind the game")) + f'<div class="grid grid--3">{sketch}</div>', id_="sketchbook")
+    trailer = section(row_head("Trailer", link("https://www.youtube.com/watch?v=" + SITE["youtube_id"], "YouTube")) + trailer_tile(), id_="trailer")
+    exhibitions = section(split("Exhibitions and playtesting", exhibition_rows() + '<p class="rows-more"><a class="link" href="exhibitions.html">All exhibitions and playtesting</a></p>'))
+    press = section(row_head("Press", '<a class="link" href="presskit.html">Press kit</a>') + press_block() + coverage_block(["Whitney Biennial 2026", "Interviews"]), id_="press", alt=True)
+    studio = section(split("Studio", f'<div class="stack"><h2 class="t-h2">{e(STUDIO["name"])}</h2>{prose([STUDIO["short"]])}'
+                                     f'<div class="actions"><a class="link" href="studio.html">Paintings and studio</a>{link(STUDIO["site"], "Leo Castañeda")}</div></div>'), id_="studio")
+    available = [m for m in MERCH if m["status"] == "available" and m.get("url")]
+    merch = section(row_head("Merch", '<a class="link" href="merch.html">All merch</a>') +
+                    '<div class="grid grid--3">' + "".join(merch_card(m) for m in available[:3]) + "</div>") if available else ""
+    cta_img = img_path(SITE["cta_image"], "main")
+    cta = f'''<section class="cta"><div class="cta__media" style="background-image:url({cta_img})"></div>{frame()}
+  <div class="cta__body wrap"><h2 class="t-h1">Wishlist Camoflux on Steam</h2>
+  <p class="t-body">Steam will notify you when Camoflux is released.</p>
+  {btn(SITE["steam_url"], "Wishlist on Steam")}</div></section>'''
 
-<section style="padding:96px 48px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
-    <div class="section-label reveal" style="padding-top:14px;">[ VISIT ]</div>
-    <div style="max-width:760px;">
-      <h2 class="reveal" style="font-size:38px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:32px;">Plan your visit.</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:32px;">
-        <div class="reveal">
-          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">ADDRESS</div>
-          <div style="font-size:15px;line-height:1.6;color:rgba(232,230,223,0.85);">{EXHIBITION['venue']}<br/>{EXHIBITION['venue_address']}</div>
-        </div>
-        <div class="reveal" style="transition-delay:0.05s;">
-          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">HOURS</div>
-          <div style="font-size:15px;line-height:1.6;color:rgba(232,230,223,0.85);">{EXHIBITION['hours']}</div>
-        </div>
-        <div class="reveal">
-          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">ADMISSION</div>
-          <div style="font-size:15px;line-height:1.6;color:rgba(232,230,223,0.85);">{EXHIBITION['admission']}</div>
-        </div>
-        <div class="reveal" style="transition-delay:0.05s;">
-          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">DATES</div>
-          <div style="font-size:15px;line-height:1.6;color:rgba(232,230,223,0.85);">{EXHIBITION['dates']}</div>
-        </div>
-      </div>
-      <a href="{EXHIBITION['visit_url']}" target="_blank" class="btn-primary">VISIT WHITNEY.ORG →</a>
-    </div>
-  </div>
-</section>
-
-{footer()}"""
-
-    return page_shell(f"{EXHIBITION['title']} — {SITE['title']}", body)
+    body = hero + facts_bar() + world + features + inplay + sketchbook + trailer + exhibitions + press + studio + merch + cta
+    return page_shell("index", SITE["full_title"], body, preload=hero_img, modal=True)
 
 
 def build_presskit():
-    """Press kit. Same as before but generated from data."""
-    facts_html = ""
+    kit = OUT / "downloads" / "camoflux-press-kit.zip"
     facts = [
-        ("TITLE", f"{SITE['title']}: {SITE['subtitle']}"),
-        ("DEVELOPER", f"{STUDIO['name']} ({STUDIO['lead']})"),
-        ("PUBLISHER", STUDIO['publisher']),
-        ("RELEASE", f"{SITE['release']} (Episode 0{SITE['episode_current']} of {'I' * SITE['episode_total']})"),
-        ("PLATFORMS", "PC (Steam) — Windows, macOS, Linux"),
-        ("PRICE", "TBA"),
-        ("ENGINE", "Unreal Engine 5"),
-        ("LANGUAGES", "English, Spanish (interface)"),
-        ("EXHIBITION", f"{EXHIBITION['subtitle']} · {EXHIBITION['dates']}"),
-        ("PRESS CONTACT", f'<a href="mailto:{SITE["press_email"]}" class="accent">{SITE["press_email"]}</a>'),
+        ("Title", e(SITE["full_title"])), ("Developer", f"{e(STUDIO['name'])} ({e(STUDIO['lead'])})"),
+        ("Publisher", e(SITE["publisher"])), ("Genre", e(SITE["genre"])), ("Status", e(SITE["status"])),
+        ("Release", e(SITE["release"])), ("Platform", e(SITE["platform"])), ("Engine", e(SITE["engine"])),
+        ("Languages", e(SITE["languages"])), ("Steam", link(SITE["steam_url"], "Store page", cls="")),
+        ("Trailer", link("https://www.youtube.com/watch?v=" + SITE["youtube_id"], "YouTube", cls="")),
+        ("Press contact", link("mailto:" + SITE["press_email"], SITE["press_email"], cls="") if SITE.get("press_email") else "See contact below"),
     ]
-    for k, v in facts:
-        facts_html += f'<div class="fact-row"><div class="fact-key">{k}</div><div class="fact-val">{v}</div></div>'
+    fact_list = '<dl class="fact-list">' + "".join(f'<div><dt class="t-meta">{k}</dt><dd>{v}</dd></div>' for k, v in facts) + "</dl>"
 
-    tags = ["Exploration", "Adventure", "Puzzle", "Stealth", "Atmospheric", "Surreal", "Philosophical"]
-    tags_html = "".join(f'<span class="tag">{t}</span>' for t in tags)
-    facts_html += f'<div class="fact-row"><div class="fact-key">GENRE</div><div class="fact-val">{tags_html}</div></div>'
+    rows = (f'<a class="row" href="downloads/{kit.name}" download><div><h3 class="t-h3">Complete press kit</h3>'
+            f'<p class="t-small">Screenshots at full resolution, logos, and fact sheet</p></div>{meta("ZIP, " + fmt_size(kit.stat().st_size))}</a>')
+    for name, label, note in (("logo-white.png", "Logo, white", "For dark backgrounds"), ("logo-black.png", "Logo, black", "For light backgrounds")):
+        f = IMG_DIR / name
+        rows += (f'<a class="row" href="images/{name}" download><div><h3 class="t-h3">{label}</h3><p class="t-small">{note}</p></div>'
+                 f'{meta(f"PNG, {MANIFEST["logo"]["width"]}×{MANIFEST["logo"]["height"]}, {fmt_size(f.stat().st_size)}")}</a>')
+    downloads = f'<div class="rows">{rows}</div>'
 
-    downloads_html = ""
-    for i, d in enumerate(DOWNLOADS):
-        delay = "transition-delay:0.05s;" if i % 2 == 1 else ""
-        downloads_html += f"""
-    <a href="{d['href']}" class="dl-card reveal" style="display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding:26px 28px;border:0.5px solid rgba(232,230,223,0.18);background:rgba(10,11,13,0.4);{delay}">
-      <div class="mono accent" style="font-size:10px;letter-spacing:0.15em;width:48px;">{d['type']}</div>
-      <div>
-        <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">{d['title']}</div>
-        <div class="mono" style="font-size:10px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">{d['meta']}</div>
-      </div>
-      <div class="dl-arrow mono" style="font-size:14px;color:rgba(232,230,223,0.6);">→</div>
-    </a>"""
+    shots = ""
+    for key, info in GAME_IMAGES.items():
+        m = MANIFEST.get(key, {})
+        f = IMG_DIR / f"{key}-master.jpg"
+        spec = f"{m.get('master_width')}×{m.get('master_height')}, {fmt_size(f.stat().st_size)}"
+        shots += (f'<a class="card" href="{img_path(key, "master")}" download>{media(key, badge_right="JPG")}'
+                  f'{meta(spec)}<h3 class="t-h3">{e(info["caption"])}</h3></a>')
 
-    awards_html = ""
-    for a in AWARDS:
-        awards_html += f"""
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:14px 0;border-bottom:0.5px solid rgba(232,230,223,0.1);">
-        <div>
-          <div style="font-size:17px;letter-spacing:-0.01em;font-weight:500;margin-bottom:4px;">{a['title']}</div>
-          <div style="font-size:13px;color:rgba(232,230,223,0.6);">{a['subtitle']}</div>
-        </div>
-        <div class="mono accent" style="font-size:10px;letter-spacing:0.12em;">{a['year']}</div>
-      </div>"""
+    recog = "".join(f'<div><div><h3 class="t-h3">{e(r["title"])}</h3><p class="t-small">{e(r["detail"])}</p></div>{meta(r["year"])}</div>' for r in RECOGNITION)
+    contacts = "".join(f'<div class="stack">{meta(lbl, "p")}{link("mailto:" + SITE[k], SITE[k], cls="t-h3")}<p class="t-small">{note}</p></div>'
+                       for lbl, k, note in (("Press", "press_email", "Interviews, review access, and coverage."),
+                                            ("Business and exhibitions", "biz_email", "Partnerships, exhibitions, and acquisitions.")) if SITE.get(k))
 
-    press_top_html = ""
-    for i, p in enumerate(PRESS_FEATURED):
-        delay = "transition-delay:0.05s;" if i > 0 else ""
-        press_top_html += f"""
-    <a href="{p['url']}" target="_blank" class="press-quote reveal" style="display:block;background:#14171a;padding:36px 32px;{delay}">
-      <p class="serif-italic" style="font-size:21px;letter-spacing:-0.015em;line-height:1.4;margin-bottom:24px;">"{p['quote']}"</p>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:18px;border-top:0.5px solid rgba(232,230,223,0.15);" class="mono">
-        <span style="font-size:11px;letter-spacing:0.12em;">{p['source']} · {p['author'].upper()}</span>
-        <span style="font-size:10px;color:rgba(232,230,223,0.5);" class="press-meta">READ →</span>
-      </div>
-    </a>"""
+    body = (page_head("Press kit", SITE["full_title"], SITE["description_50"],
+                      btn(f"downloads/{kit.name}", f"Download press kit, {fmt_size(kit.stat().st_size)}", download=True) +
+                      (btn("mailto:" + SITE["press_email"], "Email press contact", "ghost") if SITE.get("press_email") else ""))
+            + section(split("Fact sheet", fact_list))
+            + section(split("Description", f'<div class="stack-lg"><div class="stack"><h2 class="t-h3">Short</h2>{prose([SITE["description_50"]])}</div>'
+                                           f'<div class="stack"><h2 class="t-h3">Long</h2>{prose(SITE["description_150"])}</div></div>'))
+            + section(split("Downloads", downloads), alt=True)
+            + section(row_head("Screenshots", meta("Select an image to download it at full resolution")) +
+                      '<div class="grid grid--2">' + shots + "</div>", id_="screenshots")
+            + section(row_head("Trailer") + trailer_tile())
+            + section(split("Recognition", f'<div class="rows">{recog}</div>'), alt=True)
+            + section(row_head("Press") + press_block() + coverage_block(), alt=True)
+            + section(split("Studio", f'<div class="stack"><h2 class="t-h2">{e(STUDIO["name"])}</h2>{prose(STUDIO["long"])}{link(STUDIO["site"], "leonardocastaneda.com")}</div>'), id_="studio")
+            + (section(split("Contact", f'<div class="grid grid--2">{contacts}</div>'), alt=True) if contacts else ""))
+    return page_shell("presskit", f"Press kit, {SITE['full_title']}", body, description=SITE["description_50"], modal=True)
 
-    press_short_html = ""
-    for i, p in enumerate(PRESS_SHORT):
-        delay = f"transition-delay:{i*0.05}s;" if i > 0 else ""
-        press_short_html += f"""
-    <a href="{p['url']}" target="_blank" class="press-quote reveal" style="display:block;background:#14171a;padding:28px 32px;{delay}">
-      <p class="serif-italic" style="font-size:16px;letter-spacing:-0.01em;line-height:1.45;margin-bottom:16px;">"{p['quote']}"</p>
-      <div class="mono" style="font-size:10px;letter-spacing:0.12em;padding-top:14px;border-top:0.5px solid rgba(232,230,223,0.15);display:flex;justify-content:space-between;">
-        <span>{p['source']}</span>
-        <span class="press-meta" style="color:rgba(232,230,223,0.5);">READ →</span>
-      </div>
-    </a>"""
 
-    desc_long_html = "".join(f'<p style="font-size:15px;line-height:1.7;color:rgba(232,230,223,0.75);margin-bottom:18px;">{p}</p>' for p in SITE['description_150'])
+def build_exhibitions():
+    up = ""
+    for x in EXHIBITIONS["upcoming"]:
+        up += (f'<div class="stack"><h2 class="t-h2">{e(x["title"])}</h2>{meta(x["type"] + ", " + x["venue"] + ", " + x["dates"], "p")}'
+               f'{prose([e(x["body"])])}{link(x.get("url"), "Exhibition page")}</div>')
+    f = EXHIBITIONS["featured"]
+    works = ""
+    for w in f["works"]:
+        text = (f'<div class="stack">{meta(w["year"], "p")}<h3 class="t-h2">{e(w["title"])}</h3>'
+                f'{meta(w["media"], "p")}{prose([e(w["body"])])}'
+                + (f'<p class="t-small">{e(w["credits"])}</p>' if w.get("credits") else "") + "</div>")
+        if w.get("image"):
+            works += f'<article class="work">{media(w["image"], size="main")}{text}</article>'
+        else:
+            works += f'<article class="work work--text"><div class="card--text">{text}</div></article>'
+    ph = f.get("photos", [])
+    def photo(k, ar):
+        a = ARTWORK[k]
+        return f'<figure>{media(k, ar=ar, size="main")}<figcaption class="t-meta">{acc(e(a["caption"]))}. {e(a["credit"])}</figcaption></figure>'
+    photos = ""
+    if ph:
+        photos = f'<div class="photos">{photo(ph[0], "16x9")}<div class="grid grid--2">{"".join(photo(k, "4x3") for k in ph[1:])}</div></div>'
+    featured = (f'<div class="stack-lg">{photos}<div class="stack"><h2 class="t-h1">{e(f["title"])}</h2>{link(f.get("url"), "whitney.org")}'
+                f'{meta(f["venue"] + ", " + f["dates"], "p")}{meta("Curated by " + f["curators"], "p")}{prose([e(f["intro"])])}</div>'
+                f'<div>{works}</div><div class="quotes quote-single">{quote_card(f["quote"])}</div></div>')
+    def past_row(p):
+        inner = f'<div><h3 class="t-h3">{e(p["title"])}{" <span class=\"ext\" aria-hidden=\"true\">↗</span>" if p.get("url") else ""}</h3><p class="t-small">{e(p["venue"])}</p></div>{meta(p["year"])}'
+        return f'<a class="row" href="{e(p["url"])}" target="_blank" rel="noopener">{inner}<span class="sr-only"> (opens in a new tab)</span></a>' if p.get("url") else f'<div>{inner}</div>'
+    past = "".join(past_row(p) for p in EXHIBITIONS["past"])
 
-    extra_css = """
-.dl-card{transition:border-color 0.2s ease, background 0.2s ease}
-.dl-card:hover{border-color:rgba(216,255,58,0.5);background:rgba(216,255,58,0.04)}
-.dl-card:hover .dl-arrow{color:#d8ff3a;transform:translateX(4px)}
-.dl-arrow{transition:transform 0.2s ease, color 0.2s ease}
-.shot{position:relative;overflow:hidden;cursor:pointer;aspect-ratio:16/9}
-.shot-img{position:absolute;inset:0;transition:transform 0.6s cubic-bezier(0.2,0.6,0.2,1)}
-.shot:hover .shot-img{transform:scale(1.04)}
-.shot-overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(10,11,13,0.85) 0%,transparent 50%);opacity:0;transition:opacity 0.3s ease;display:flex;flex-direction:column;justify-content:flex-end;padding:18px}
-.shot:hover .shot-overlay{opacity:1}
-.fact-row{display:grid;grid-template-columns:200px 1fr;gap:32px;padding:18px 0;border-bottom:0.5px solid rgba(232,230,223,0.1)}
-.fact-row:last-child{border-bottom:none}
-.fact-key{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.15em;color:rgba(232,230,223,0.5);padding-top:2px}
-.fact-val{font-size:15px;color:rgba(232,230,223,0.92);line-height:1.6}
-.tag{display:inline-block;padding:5px 11px;border:0.5px solid rgba(232,230,223,0.25);font-size:11px;letter-spacing:0.05em;color:rgba(232,230,223,0.75);margin:0 6px 6px 0;font-family:'JetBrains Mono',monospace}
-.press-quote{transition:background 0.3s ease, transform 0.3s ease}
-.press-quote:hover{background:#1a1d20;transform:translateY(-3px)}
-.press-quote:hover .press-meta{color:#d8ff3a}
-.press-meta{transition:color 0.25s ease}
-"""
+    body = (page_head("Exhibitions and playtesting", "Exhibitions and playtesting", "Where Camoflux has been shown and played: installations, sculpture, commissions, and public playtests.")
+            + section(split("Upcoming", up), id_="upcoming")
+            + section(split("2026", featured), id_="whitney", alt=True)
+            + section(split("History", f'<div class="stack-lg"><div class="rows">{past}</div>'
+                            f'<figure class="history-photo">{media("supercon-performance", ar="16x9", size="main")}<figcaption class="t-meta">{acc(e(ARTWORK["supercon-performance"]["caption"]))}. {e(ARTWORK["supercon-performance"]["credit"])}</figcaption></figure></div>')))
+    return page_shell("exhibitions", f"Exhibitions and playtesting, {SITE['full_title']}", body)
 
-    body = f"""{header(active="press")}
 
-<section style="padding:80px 48px 40px;border-bottom:0.5px solid rgba(232,230,223,0.1);">
-  <div class="mono reveal" style="font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.5);margin-bottom:18px;">[ PRESS KIT · v{SITE['build_date']} ]</div>
-  <h1 class="reveal" style="font-size:88px;line-height:0.95;letter-spacing:-0.04em;font-weight:500;margin-bottom:28px;max-width:1100px;transition-delay:0.1s;">Materials for the press.</h1>
-  <p class="reveal" style="font-size:17px;line-height:1.6;color:rgba(232,230,223,0.7);max-width:680px;margin-bottom:36px;transition-delay:0.2s;">Logos, screenshots, key art, trailers, and a fact sheet for journalists, curators, and broadcasters covering Camoflux. All assets cleared for editorial use.</p>
-  <div class="reveal" style="display:flex;gap:14px;align-items:center;transition-delay:0.3s;">
-    <a href="#" class="btn-primary">DOWNLOAD ALL ASSETS<span style="font-size:10px;color:rgba(10,11,13,0.6);letter-spacing:0.1em;">.ZIP · 482 MB</span></a>
-    <a href="mailto:{SITE['press_email']}" class="btn-secondary">PRESS ENQUIRIES →</a>
-  </div>
-</section>
+def published():
+    return [p for p in DEVLOG if not p.get("draft")]
 
-{status_bar()}
+def build_devlog_index():
+    posts = published()
+    body = (page_head("Devlog", "Notes from the studio", "News, process, and exhibition reports from Levels & Bosses.")
+            + section('<div class="grid grid--3">' + "".join(devlog_card(p) for p in posts) + "</div>"))
+    return page_shell("devlog", f"Devlog, {SITE['full_title']}", body)
 
-<section style="padding:120px 48px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
-    <div><div class="section-label reveal">[ 01 / FACT SHEET ]</div></div>
-    <div class="reveal" style="max-width:880px;">{facts_html}</div>
-  </div>
-</section>
-
-<section style="padding:0 48px 120px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
-    <div><div class="section-label reveal">[ 02 / DESCRIPTION ]</div></div>
-    <div style="max-width:760px;">
-      <div class="reveal">
-        <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:14px;">SHORT — 50 WORDS</div>
-        <p style="font-size:17px;line-height:1.7;color:rgba(232,230,223,0.85);margin-bottom:48px;">{SITE['description_50']}</p>
-      </div>
-      <div class="reveal" style="transition-delay:0.1s;">
-        <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:14px;">LONG — 150 WORDS</div>
-        {desc_long_html}
-      </div>
-    </div>
-  </div>
-</section>
-
-<section style="padding:120px 48px;background:#14171a;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:48px;">
-    <div><div class="section-label reveal">[ 03 / DOWNLOADS ]</div></div>
-    <h2 class="reveal" style="font-size:34px;letter-spacing:-0.025em;line-height:1.2;font-weight:400;">Asset packs.</h2>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">{downloads_html}</div>
-</section>
-
-<section style="padding:120px 48px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:48px;">
-    <div><div class="section-label reveal">[ 04 / SCREENSHOTS ]</div></div>
-    <div>
-      <h2 class="reveal" style="font-size:34px;letter-spacing:-0.025em;line-height:1.2;font-weight:400;margin-bottom:14px;">Screen captures.</h2>
-      <p class="reveal" style="font-size:14px;color:rgba(232,230,223,0.6);max-width:520px;line-height:1.6;transition-delay:0.1s;">Click any image to download in 4K. All captures rendered in-engine in Unreal Engine 5.</p>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;">
-    <div class="shot reveal" style="aspect-ratio:16/9;">
-      <div class="shot-img" style="background:url({IMAGES['cavern']}) center/cover no-repeat;"></div>
-      <div class="shot-overlay">
-        <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.7);margin-bottom:6px;">SS_001 · 3840×2160 · 24.4 MB</div>
-        <div style="font-size:15px;letter-spacing:-0.01em;">Mangrove Village Teleporter — Level 01</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-rows:1fr 1fr;gap:14px;">
-      <div class="shot reveal" style="transition-delay:0.05s;">
-        <div class="shot-img" style="background:url({IMAGES['igapo']}) center/cover no-repeat;"></div>
-        <div class="shot-overlay">
-          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.7);margin-bottom:6px;">SS_002 · 3840×2160 · 18.1 MB</div>
-          <div style="font-size:15px;letter-spacing:-0.01em;">Amazonian Igapó — Butterfly Drone</div>
-        </div>
-      </div>
-      <div class="shot reveal" style="transition-delay:0.1s;">
-        <div class="shot-img" style="background:url({IMAGES['mangrove']}) center/cover no-repeat;"></div>
-        <div class="shot-overlay">
-          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.7);margin-bottom:6px;">SS_003 · 3840×2160 · 21.7 MB</div>
-          <div style="font-size:15px;letter-spacing:-0.01em;">Mangrove Boss — Incendio Igapó</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section style="padding:0 48px 120px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:32px;">
-    <div><div class="section-label reveal">[ 05 / VIDEO ]</div></div>
-    <h2 class="reveal" style="font-size:34px;letter-spacing:-0.025em;line-height:1.2;font-weight:400;">Official trailer.</h2>
-  </div>
-  <div class="reveal" style="position:relative;aspect-ratio:16/9;overflow:hidden;background:#000;">
-    <iframe width="100%" height="100%" src="https://www.youtube.com/embed/{SITE['youtube_id']}?rel=0" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;"></iframe>
-  </div>
-</section>
-
-<section style="padding:120px 48px;background:#14171a;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:48px;">
-    <div><div class="section-label reveal">[ 06 / AWARDS &amp; PRESS ]</div></div>
-    <h2 class="reveal" style="font-size:34px;letter-spacing:-0.025em;line-height:1.2;font-weight:400;">Recognition.</h2>
-  </div>
-  <div class="reveal" style="display:grid;grid-template-columns:240px 1fr;gap:64px;margin-bottom:48px;padding-bottom:36px;border-bottom:0.5px solid rgba(232,230,223,0.1);">
-    <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);padding-top:6px;">AWARDS</div>
-    <div>{awards_html}</div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(232,230,223,0.1);margin-bottom:1px;">
-    {press_top_html}
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:rgba(232,230,223,0.1);">
-    {press_short_html}
-  </div>
-</section>
-
-<section style="padding:120px 48px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
-    <div><div class="section-label reveal">[ 07 / STUDIO ]</div></div>
-    <div style="max-width:760px;">
-      <h2 class="reveal" style="font-size:38px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:24px;">About {STUDIO['name']}</h2>
-      {"".join(f'<p class="reveal" style="font-size:16px;line-height:1.7;color:rgba(232,230,223,0.78);margin-bottom:18px;transition-delay:{i*0.05}s;">{p}</p>' for i, p in enumerate(STUDIO['blurb_long']))}
-    </div>
-  </div>
-</section>
-
-<section style="padding:120px 48px;background:#14171a;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
-    <div><div class="section-label reveal">[ 08 / CONTACT ]</div></div>
-    <div style="max-width:760px;">
-      <h2 class="reveal" style="font-size:38px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:32px;">Get in touch.</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
-        <div class="reveal">
-          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">PRESS &amp; MEDIA</div>
-          <a href="mailto:{SITE['press_email']}" style="font-size:18px;letter-spacing:-0.01em;color:#e8e6df;">{SITE['press_email']}</a>
-          <div style="font-size:13px;color:rgba(232,230,223,0.55);margin-top:8px;line-height:1.5;">For interviews, review codes, and editorial coverage.</div>
-        </div>
-        <div class="reveal" style="transition-delay:0.05s;">
-          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:10px;">BUSINESS &amp; CURATION</div>
-          <a href="mailto:{SITE['biz_email']}" style="font-size:18px;letter-spacing:-0.01em;color:#e8e6df;">{SITE['biz_email']}</a>
-          <div style="font-size:13px;color:rgba(232,230,223,0.55);margin-top:8px;line-height:1.5;">For partnerships, exhibitions, and acquisitions.</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-{footer()}"""
-
-    return page_shell(f"Press Kit — {SITE['title']}", body, extra_css=extra_css)
+def build_devlog_post(p, posts):
+    i = posts.index(p)
+    newer = posts[i - 1] if i > 0 else None
+    older = posts[i + 1] if i < len(posts) - 1 else None
+    nav = '<nav class="post-nav" aria-label="More posts">'
+    nav += f'<a href="devlog-{newer["id"]}.html">{meta("Newer")}<span class="t-h3">{e(newer["title"])}</span></a>' if newer else "<span></span>"
+    nav += f'<a href="devlog-{older["id"]}.html">{meta("Older")}<span class="t-h3">{e(older["title"])}</span></a>' if older else "<span></span>"
+    nav += "</nav>"
+    figure = ""
+    if p.get("image"):
+        figure = (f'<figure class="stack">{media(p["image"], ar="21x9", size="main")}'
+                  f'<figcaption class="t-small">{e(IMAGES[p["image"]]["caption"])}</figcaption></figure>')
+    head = (f'<section class="page-head"><div class="wrap">'
+            f'<p class="t-meta"><a href="devlog.html">Devlog</a>, <time datetime="{p["date"]}">{fmt_date(p["date"])}</time>, {e(p["category"])}</p>'
+            f'<h1 class="t-h1">{e(p["title"])}</h1><p class="t-lead">{e(p["excerpt"])}</p></div></section>')
+    body = head + section(f'<div class="stack-lg">{figure}<div class="split">{meta(p["category"], "p")}<div>{prose([e(x) for x in p["body"]])}{nav}</div></div></div>')
+    return page_shell("devlog", f"{p['title']}, Devlog", body, description=p["excerpt"])
 
 
 def build_merch():
-    """Merch / shop page."""
-    cavern = IMAGES['cavern']
-
-    # Build merch grid — items with images get real photos; items without get a styled placeholder
-    items_html = ""
-    for i, m in enumerate(MERCH):
-        delay_idx = i % 3
-        delay = f"transition-delay:{delay_idx*0.05}s;" if delay_idx > 0 else ""
-
-        if m.get('image'):
-            img_url = IMAGES_SM[m['image']]
-            img_block = f"""<div class="img-wrap" style="aspect-ratio:1/1;background:url({img_url}) center/cover no-repeat;position:relative;overflow:hidden;margin-bottom:18px;">
-        <div class="img-inner" style="position:absolute;inset:0;background:url({img_url}) center/cover no-repeat;transition:transform 0.8s cubic-bezier(0.2,0.6,0.2,1);"></div>
-        <div class="mono accent" style="position:absolute;top:14px;left:14px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:5px 9px;z-index:2;">{m['category']}</div>
-        <div class="mono" style="position:absolute;top:14px;right:14px;font-size:9px;letter-spacing:0.15em;background:rgba(10,11,13,0.7);padding:5px 9px;color:#e8e6df;z-index:2;">{m['status']}</div>
-      </div>"""
-        else:
-            # Styled placeholder for artbook / vinyl / tshirt
-            img_block = f"""<div class="img-wrap" style="aspect-ratio:1/1;background:linear-gradient(135deg,#1a1d20,#2c2f33);position:relative;overflow:hidden;margin-bottom:18px;display:flex;align-items:center;justify-content:center;">
-        <div class="mono accent" style="position:absolute;top:14px;left:14px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:5px 9px;z-index:2;">{m['category']}</div>
-        <div class="mono" style="position:absolute;top:14px;right:14px;font-size:9px;letter-spacing:0.15em;background:rgba(10,11,13,0.7);padding:5px 9px;color:#e8e6df;z-index:2;">{m['status']}</div>
-        <div class="mono" style="font-size:11px;letter-spacing:0.15em;color:rgba(232,230,223,0.4);">[ PRODUCT IMAGE ]</div>
-      </div>"""
-
-        # Status color
-        status_color = "#d8ff3a" if m['status'] == "AVAILABLE" else ("#e8e6df" if m['status'] == "PRE-ORDER" else "rgba(232,230,223,0.6)")
-
-        items_html += f"""
-    <article class="merch-card reveal" style="{delay}">
-      {img_block}
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
-        <h3 style="font-size:22px;letter-spacing:-0.02em;font-weight:500;">{m['name']}</h3>
-        <div class="mono" style="font-size:15px;letter-spacing:0.05em;color:#e8e6df;">{m['price']}</div>
-      </div>
-      <div class="mono" style="font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.5);margin-bottom:12px;">{m['edition']} · {m['format']}</div>
-      <p style="font-size:14px;color:rgba(232,230,223,0.7);line-height:1.55;margin-bottom:18px;">{m['description']}</p>
-      <a href="{m['href']}" class="mono accent" style="font-size:11px;letter-spacing:0.12em;display:inline-block;">
-        {'BUY NOW' if m['status'] == 'AVAILABLE' else 'PRE-ORDER' if m['status'] == 'PRE-ORDER' else 'NOTIFY ME'} →
-      </a>
-    </article>"""
-
-    extra_css = """
-.merch-card{transition:transform 0.4s cubic-bezier(0.2,0.6,0.2,1)}
-.merch-card:hover{transform:translateY(-6px)}
-.merch-card .img-wrap{transition:filter 0.4s ease}
-.merch-card:hover .img-wrap{filter:brightness(1.08)}
-.merch-card:hover .img-inner{transform:scale(1.05)}
-"""
-
-    body = f"""{header(active="merch")}
-
-<section style="position:relative;height:420px;overflow:hidden;">
-  <div class="hero-bg" style="background:url({cavern}) center/cover no-repeat;"></div>
-  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,11,13,0.55) 0%,rgba(10,11,13,0.3) 50%,rgba(10,11,13,0.95) 100%);"></div>
-  <div style="position:absolute;top:32px;left:48px;right:48px;display:flex;justify-content:space-between;font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.65);" class="mono">
-    <div>[ MERCH // SHOP ]</div>
-    <div class="accent status-live">● AVAILABLE</div>
-  </div>
-  <div class="corner" style="top:24px;left:40px;border-left:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="top:24px;right:40px;border-right:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:24px;left:40px;border-left:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:24px;right:40px;border-right:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div style="position:absolute;bottom:64px;left:48px;right:48px;">
-    <div class="mono reveal" style="font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.7);margin-bottom:18px;">[ PRINTS · APPAREL · BOOKS · VINYL ]</div>
-    <h1 class="reveal" style="font-size:80px;line-height:0.95;letter-spacing:-0.04em;font-weight:500;max-width:1000px;transition-delay:0.1s;">Objects from the world.</h1>
-  </div>
-</section>
-
-{status_bar()}
-
-<section style="padding:80px 48px 48px;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;">
-    <div class="section-label reveal" style="padding-top:14px;">[ ABOUT ]</div>
-    <p class="reveal" style="font-size:18px;line-height:1.65;color:rgba(232,230,223,0.8);max-width:760px;transition-delay:0.05s;">Limited-edition prints, soundtracks on vinyl, the making-of monograph, and apparel — all produced in small runs and shipped from Brooklyn. A portion of every sale supports the next episode.</p>
-  </div>
-</section>
-
-<section style="padding:0 48px 96px;">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:36px;" class="mono">
-    <div class="section-label">[ PRODUCTS ]</div>
-    <div style="font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.4);">{len(MERCH):02d} ITEMS</div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:36px;">
-    {items_html}
-  </div>
-</section>
-
-<section style="padding:96px 48px;background:#14171a;">
-  <div style="display:grid;grid-template-columns:240px 1fr;gap:64px;align-items:start;">
-    <div class="section-label reveal" style="padding-top:14px;">[ SHIPPING ]</div>
-    <div style="max-width:760px;">
-      <h2 class="reveal" style="font-size:32px;letter-spacing:-0.025em;line-height:1.15;font-weight:500;margin-bottom:24px;">Made small. Shipped slow.</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:36px;">
-        <div class="reveal">
-          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:8px;">FULFILLMENT</div>
-          <p style="font-size:14px;color:rgba(232,230,223,0.78);line-height:1.6;">Prints ship in 5–10 days from Mast Editions in Brooklyn. Pre-orders ship when the run is complete; you'll get a tracked confirmation email.</p>
-        </div>
-        <div class="reveal" style="transition-delay:0.05s;">
-          <div class="mono" style="font-size:10px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:8px;">INTERNATIONAL</div>
-          <p style="font-size:14px;color:rgba(232,230,223,0.78);line-height:1.6;">We ship worldwide. International orders pay actual carrier rates calculated at checkout. Customs fees are buyer's responsibility.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-{footer()}"""
-
-    return page_shell(f"Merch — {SITE['title']}", body, extra_css=extra_css)
+    body = page_head("Merch", "Merch", MERCH_NOTE)
+    if MERCH:
+        body += section('<div class="grid grid--3">' + "".join(merch_card(m) for m in MERCH) + "</div>")
+    return page_shell("merch", f"Merch, {SITE['full_title']}", body)
 
 
-def build_mobile():
-    """Mobile homepage. Wrapped in a phone frame for desktop preview;
-    auto-strips frame on actual mobile devices."""
-    cavern = IMAGES['cavern']
-    yt_id = SITE['youtube_id']
-    yt_thumb = YT_THUMB
-
-    # Marquee
-    marquee_html = ""
-    for _ in range(2):
-        for term in SITE['marquee_terms'][:5]:
-            marquee_html += f'<span>{term}</span><span class="accent">●</span>'
-
-    # Features stacked
-    features_html = ""
-    for f in FEATURES:
-        if f['image']:
-            img_block = f'<div style="aspect-ratio:16/9;background:url({IMAGES_SM[f["image"]]}) center/cover no-repeat;position:relative;margin-bottom:14px;"><div class="mono accent" style="position:absolute;top:10px;left:10px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:4px 8px;">{f["tag"]}</div></div>'
-        else:
-            img_block = f'<div style="aspect-ratio:16/9;background:linear-gradient(135deg,#1a1d20,#2c2f33);position:relative;margin-bottom:14px;display:flex;align-items:center;justify-content:center;"><div class="mono accent" style="position:absolute;top:10px;left:10px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:4px 8px;">{f["tag"]}</div><div class="mono" style="font-size:10px;letter-spacing:0.15em;color:rgba(232,230,223,0.5);">[ PROCESS DOC ]</div></div>'
-
-        features_html += f"""
-    <article class="reveal">
-      {img_block}
-      <div class="mono" style="font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.5);margin-bottom:8px;">{f['category']}</div>
-      <h3 style="font-size:22px;letter-spacing:-0.025em;margin-bottom:8px;font-weight:500;">{f['title']}</h3>
-      <p style="font-size:14px;color:rgba(232,230,223,0.65);line-height:1.55;">{f['body']}</p>
-    </article>"""
-
-    # Press cards as horizontal scroll
-    press_cards = ""
-    for p in PRESS_FEATURED:
-        press_cards += f"""
-      <a href="{p['url']}" target="_blank" class="press-card-m" style="background:#0a0b0d;padding:22px;width:280px;flex-shrink:0;border:0.5px solid rgba(232,230,223,0.1);display:block;">
-        <p class="serif-italic" style="font-size:16px;letter-spacing:-0.01em;line-height:1.4;margin-bottom:18px;">"{p['quote']}"</p>
-        <div style="display:flex;justify-content:space-between;padding-top:14px;border-top:0.5px solid rgba(232,230,223,0.15);" class="mono">
-          <span style="font-size:10px;letter-spacing:0.12em;">{p['source']}</span>
-          <span style="font-size:9px;color:rgba(232,230,223,0.5);" class="press-meta">{p['date']} · READ →</span>
-        </div>
-      </a>"""
-
-    for p in PRESS_SHORT:
-        press_cards += f"""
-      <a href="{p['url']}" target="_blank" class="press-card-m" style="background:#0a0b0d;padding:22px;width:240px;flex-shrink:0;border:0.5px solid rgba(232,230,223,0.1);display:block;">
-        <p class="serif-italic" style="font-size:15px;letter-spacing:-0.01em;line-height:1.45;margin-bottom:16px;">"{p['quote']}"</p>
-        <div class="mono" style="font-size:10px;letter-spacing:0.12em;padding-top:12px;border-top:0.5px solid rgba(232,230,223,0.15);display:flex;justify-content:space-between;">
-          <span>{p['source']}</span>
-          <span class="press-meta" style="color:rgba(232,230,223,0.5);">READ →</span>
-        </div>
-      </a>"""
-
-    # Merch teaser - 3 items with images, horizontal scroll
-    merch_with_images = [m for m in MERCH if m.get('image')][:3]
-    merch_cards = ""
-    for m in merch_with_images:
-        img_url = IMAGES_SM[m['image']]
-        merch_cards += f"""
-      <a href="merch.html" class="merch-card-m" style="display:block;width:240px;flex-shrink:0;">
-        <div style="aspect-ratio:1/1;background:url({img_url}) center/cover no-repeat;position:relative;margin-bottom:12px;">
-          <div class="mono accent" style="position:absolute;top:10px;left:10px;font-size:9px;letter-spacing:0.2em;background:rgba(10,11,13,0.7);padding:4px 8px;">{m['category']}</div>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
-          <h3 style="font-size:15px;letter-spacing:-0.015em;font-weight:500;">{m['name']}</h3>
-          <div class="mono" style="font-size:12px;letter-spacing:0.05em;">{m['price']}</div>
-        </div>
-        <div class="mono" style="font-size:9px;letter-spacing:0.12em;color:rgba(232,230,223,0.5);">{m['edition']}</div>
-      </a>"""
-
-    nav_html_mobile = ""
-    for item in NAV:
-        nav_html_mobile += f'<a href="{item["href"]}" style="font-size:32px;letter-spacing:-0.025em;font-weight:500;">{item["label"].title()}</a>'
-
-    # Mobile-specific CSS — built fresh, doesn't share desktop minimum-width
-    mobile_css = """
-*{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
-html,body{background:#0a0b0d;color:#e8e6df;font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-body{overflow-x:hidden}
-.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
-.serif-italic{font-family:Georgia,serif;font-style:italic}
-.corner{position:absolute;width:10px;height:10px;pointer-events:none}
-.accent{color:#d8ff3a}
-.section-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.22em;color:rgba(232,230,223,0.45)}
-a{color:inherit;text-decoration:none}
-em{font-family:Georgia,serif;font-style:italic;font-weight:400}
-.btn-primary{background:#d8ff3a;color:#0a0b0d;padding:14px 22px;font-size:12px;letter-spacing:0.08em;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;border:none;font-family:'Inter',sans-serif;width:100%;text-align:center}
-.btn-secondary{border:0.5px solid rgba(232,230,223,0.5);background:rgba(232,230,223,0.06);padding:14px 22px;font-size:12px;letter-spacing:0.08em;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;color:#e8e6df;font-family:'Inter',sans-serif;width:100%;text-align:center;transition:background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease}
-.btn-secondary:active{background:#e8e6df;color:#0a0b0d;border-color:#e8e6df;box-shadow:0 0 32px rgba(232,230,223,0.45)}
-.btn-secondary:active .play-arrow{border-left-color:#0a0b0d}
-.play-arrow{transition:border-left-color 0.25s ease}
-@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
-.rec-dot{display:inline-block;animation:pulse-dot 1.6s ease-in-out infinite}
-@keyframes pulse-status{0%,100%{opacity:1}50%{opacity:0.5}}
-.status-live{animation:pulse-status 2s ease-in-out infinite}
-@keyframes ken-burns{0%{transform:scale(1.0)}50%{transform:scale(1.1)}100%{transform:scale(1.0)}}
-.hero-bg{position:absolute;inset:0;animation:ken-burns 24s ease-in-out infinite;will-change:transform}
-@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.marquee{display:flex;gap:32px;animation:marquee 30s linear infinite;width:max-content}
-.marquee-wrap{overflow:hidden;mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
-.reveal{opacity:0;transform:translateY(16px);transition:opacity 0.7s cubic-bezier(0.2,0.6,0.2,1), transform 0.7s cubic-bezier(0.2,0.6,0.2,1)}
-.reveal.in{opacity:1;transform:translateY(0)}
-.menu-overlay{position:fixed;inset:0;background:rgba(10,11,13,0.97);backdrop-filter:blur(20px);z-index:100;display:flex;flex-direction:column;padding:80px 24px 24px;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.2,0.6,0.2,1);gap:24px}
-.menu-overlay.open{transform:translateX(0)}
-.hamburger{width:28px;height:18px;position:relative;cursor:pointer;background:none;border:none;padding:0}
-.hamburger span{display:block;position:absolute;height:1.5px;width:100%;background:#e8e6df;left:0;transition:all 0.3s ease}
-.hamburger span:nth-child(1){top:0}
-.hamburger span:nth-child(2){top:50%;transform:translateY(-50%)}
-.hamburger span:nth-child(3){bottom:0}
-.hamburger.open{z-index:200}
-.hamburger.open span:nth-child(1){top:50%;transform:translateY(-50%) rotate(45deg)}
-.hamburger.open span:nth-child(2){opacity:0}
-.hamburger.open span:nth-child(3){bottom:50%;transform:translateY(50%) rotate(-45deg)}
-.phone-frame{max-width:430px;margin:24px auto;background:#0a0b0d;border:8px solid #1a1d20;border-radius:48px;overflow:hidden;box-shadow:0 40px 80px -20px rgba(0,0,0,0.6);position:relative}
-.phone-frame::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:28px;background:#1a1d20;border-radius:0 0 18px 18px;z-index:200}
-.phone-content{height:920px;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
-.phone-content::-webkit-scrollbar{display:none}
-.preview-wrapper{padding:24px;background:linear-gradient(135deg,#1a1d20,#2c2f33);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
-.preview-label{color:rgba(232,230,223,0.6);font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.18em;margin-bottom:8px;text-transform:uppercase}
-.scroll-row{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-.scroll-row::-webkit-scrollbar{display:none}
-@media (max-width:480px){.preview-wrapper{padding:0;background:#0a0b0d}.preview-label{display:none}.phone-frame{margin:0;border:none;border-radius:0}.phone-frame::before{display:none}.phone-content{height:auto;overflow:visible}}
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important}.hero-bg{animation:none}.reveal{opacity:1;transform:none}}
-"""
-
-    body_inner = f"""
-<header style="position:sticky;top:0;z-index:60;display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:rgba(10,11,13,0.85);backdrop-filter:blur(12px);border-bottom:0.5px solid rgba(232,230,223,0.1);" class="mono">
-  <div style="display:flex;align-items:center;gap:8px;">
-    <div class="rec-dot" style="width:6px;height:6px;background:#d8ff3a;border-radius:50%;"></div>
-    <a href="index.html" style="font-size:11px;font-weight:500;letter-spacing:0.05em;">CAMOFLUX</a>
-    <span style="color:rgba(232,230,223,0.4);font-size:10px;letter-spacing:0.18em;margin-left:8px;">[ PART ONE ]</span>
-  </div>
-  <button class="hamburger" id="menu-btn" aria-label="Menu">
-    <span></span><span></span><span></span>
-  </button>
-</header>
-
-<div class="menu-overlay" id="menu">
-  <div class="mono" style="font-size:9px;letter-spacing:0.22em;color:rgba(232,230,223,0.45);">[ NAVIGATION ]</div>
-  <nav style="display:flex;flex-direction:column;gap:24px;flex:1;">
-    {nav_html_mobile}
-  </nav>
-  <div style="border-top:0.5px solid rgba(232,230,223,0.15);padding-top:24px;">
-    <div class="mono" style="font-size:9px;letter-spacing:0.22em;color:rgba(232,230,223,0.45);margin-bottom:14px;">[ FOLLOW ]</div>
-    <div style="display:flex;gap:18px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.12em;color:rgba(232,230,223,0.6);">
-      <a href="{SOCIAL['youtube']}" target="_blank">YT</a>
-      <a href="{SOCIAL['instagram']}" target="_blank">IG</a>
-      <a href="{SOCIAL['x']}" target="_blank">X</a>
-      <a href="{SOCIAL['tiktok']}" target="_blank">TT</a>
-    </div>
-  </div>
-  <a href="{SITE['steam_url']}" target="_blank" class="btn-primary">WISHLIST ON STEAM →</a>
-</div>
-
-<section style="position:relative;height:560px;overflow:hidden;">
-  <div class="hero-bg" style="background:url({cavern}) center/cover no-repeat;"></div>
-  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,11,13,0.5) 0%,rgba(10,11,13,0.2) 30%,rgba(10,11,13,0.5) 65%,rgba(10,11,13,0.95) 100%);"></div>
-  <div style="position:absolute;top:18px;left:20px;right:20px;display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.65);" class="mono">
-    <div>[ PART_01 ]</div>
-    <div class="accent status-live">● REC</div>
-  </div>
-  <div class="corner" style="top:14px;left:16px;border-left:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="top:14px;right:16px;border-right:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:14px;left:16px;border-left:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:14px;right:16px;border-right:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div style="position:absolute;bottom:32px;left:24px;right:24px;">
-    <div class="mono" style="font-size:9px;letter-spacing:0.22em;color:rgba(232,230,223,0.65);margin-bottom:14px;">EPISODIC EXPLORATION · 2026</div>
-    <h1 style="font-size:42px;line-height:0.98;letter-spacing:-0.035em;font-weight:500;margin-bottom:16px;">{SITE['tagline']}</h1>
-    <p style="font-size:13px;line-height:1.55;color:rgba(232,230,223,0.78);margin-bottom:18px;">{SITE['description_short']}</p>
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <a href="{SITE['steam_url']}" target="_blank" class="btn-primary">WISHLIST ON STEAM →</a>
-      <a href="https://www.youtube.com/watch?v={yt_id}" target="_blank" class="btn-secondary">
-        <div class="play-arrow" style="width:0;height:0;border-left:6px solid #e8e6df;border-top:4px solid transparent;border-bottom:4px solid transparent;"></div>
-        WATCH TRAILER · {SITE['trailer_duration']}
-      </a>
-    </div>
-  </div>
-</section>
-
-<section style="padding:14px 20px;background:#14171a;display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.15em;color:rgba(232,230,223,0.55);border-bottom:0.5px solid rgba(232,230,223,0.08);" class="mono">
-  <span>STATUS: <span class="accent">{SITE['status']}</span></span>
-  <span>EP 0{SITE['episode_current']}/{'I' * SITE['episode_total']} · {SITE['engine']}</span>
-</section>
-
-<section style="padding:24px 20px;background:#0f1012;border-bottom:0.5px solid rgba(232,230,223,0.08);">
-  <div class="section-label" style="margin-bottom:6px;">[ NOW SHOWING ]</div>
-  <div style="font-size:16px;letter-spacing:-0.01em;font-weight:500;margin-bottom:10px;">{EXHIBITION['subtitle']}</div>
-  <div class="serif-italic" style="font-size:13px;color:rgba(232,230,223,0.7);line-height:1.55;margin-bottom:14px;">"{EXHIBITION['press_quote']}"</div>
-  <a href="exhibition.html" class="mono accent" style="font-size:10px;letter-spacing:0.15em;">VISIT · {EXHIBITION['dates'].upper()} →</a>
-</section>
-
-<section class="marquee-wrap" style="padding:14px 0;background:#0a0b0d;border-bottom:0.5px solid rgba(232,230,223,0.08);">
-  <div class="marquee mono" style="font-size:11px;letter-spacing:0.15em;color:rgba(232,230,223,0.45);">
-    {marquee_html}
-  </div>
-</section>
-
-<section style="padding:56px 24px;">
-  <div class="section-label reveal" style="margin-bottom:18px;">[ PART_01 ]</div>
-  <h2 class="reveal" style="font-size:34px;letter-spacing:-0.03em;line-height:1.05;font-weight:500;margin-bottom:18px;">You are <em>The Other</em>.</h2>
-  <p class="reveal" style="font-size:14px;line-height:1.65;color:rgba(232,230,223,0.7);">A third-person ontology where landscapes, bodies, and technology fuse. Adapt through vibrational terraforming, camouflage, and electromagnetic sensors. Choose to destroy bosses — or engage with them.</p>
-</section>
-
-<section style="padding:0 24px 56px;">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px;" class="mono">
-    <div class="section-label">[ FEATURES ]</div>
-    <div style="font-size:9px;letter-spacing:0.15em;color:rgba(232,230,223,0.4);">{len(FEATURES):02d} SYSTEMS</div>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:32px;">
-    {features_html}
-  </div>
-</section>
-
-<section style="padding:0 24px 56px;">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px;" class="mono">
-    <div class="section-label">[ TRAILER ]</div>
-    <div style="font-size:9px;letter-spacing:0.15em;color:rgba(232,230,223,0.4);">{SITE['trailer_duration']} · 4K</div>
-  </div>
-  <a href="https://www.youtube.com/watch?v={yt_id}" target="_blank" style="position:relative;aspect-ratio:16/9;overflow:hidden;display:block;background:url({yt_thumb}) center/cover no-repeat;">
-    <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(10,11,13,0.7) 100%);"></div>
-    <div class="mono" style="position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.15em;color:rgba(232,230,223,0.7);">
-      <span class="accent status-live">● LIVE FEED</span>
-      <span>YT://{yt_id}</span>
-    </div>
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border:1px solid rgba(232,230,223,0.85);border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(10,11,13,0.4);">
-      <div style="width:0;height:0;border-left:14px solid #e8e6df;border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:4px;"></div>
-    </div>
-  </a>
-</section>
-
-<section style="padding:56px 0;background:#14171a;">
-  <div style="padding:0 24px;margin-bottom:20px;">
-    <div class="section-label reveal" style="margin-bottom:14px;">[ PRESS ]</div>
-    <h2 class="reveal" style="font-size:24px;letter-spacing:-0.025em;line-height:1.2;font-weight:400;">Critics on the practice.</h2>
-  </div>
-  <div class="scroll-row" style="padding:0 24px 8px;">
-    <div style="display:flex;gap:14px;width:max-content;">
-      {press_cards}
-    </div>
-  </div>
-  <div style="padding:18px 24px 0;text-align:right;">
-    <a href="presskit.html" class="mono accent" style="font-size:10px;letter-spacing:0.15em;">FULL PRESS KIT →</a>
-  </div>
-</section>
-
-<section style="padding:56px 0;">
-  <div style="padding:0 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:baseline;" class="mono">
-    <div class="section-label">[ MERCH ]</div>
-    <a href="merch.html" class="accent" style="font-size:10px;letter-spacing:0.15em;">SHOP ALL →</a>
-  </div>
-  <div class="scroll-row" style="padding:0 24px 8px;">
-    <div style="display:flex;gap:16px;width:max-content;">
-      {merch_cards}
-    </div>
-  </div>
-</section>
-
-<section style="padding:56px 24px;">
-  <div class="section-label reveal" style="margin-bottom:14px;">[ STUDIO ]</div>
-  <h2 class="reveal" style="font-size:28px;letter-spacing:-0.025em;line-height:1.1;font-weight:500;margin-bottom:16px;">{STUDIO['name']}</h2>
-  <p class="reveal" style="font-size:14px;color:rgba(232,230,223,0.7);line-height:1.65;margin-bottom:18px;">{STUDIO['blurb_short']}</p>
-  <a href="#" class="mono accent" style="font-size:10px;letter-spacing:0.15em;">ABOUT THE STUDIO →</a>
-</section>
-
-<section style="position:relative;padding:72px 24px;text-align:center;overflow:hidden;">
-  <div class="hero-bg" style="background:url({cavern}) center/cover no-repeat;animation-duration:32s;"></div>
-  <div style="position:absolute;inset:0;background:rgba(10,11,13,0.78);"></div>
-  <div class="corner" style="top:18px;left:20px;border-left:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="top:18px;right:20px;border-right:1px solid rgba(232,230,223,0.5);border-top:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:18px;left:20px;border-left:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div class="corner" style="bottom:18px;right:20px;border-right:1px solid rgba(232,230,223,0.5);border-bottom:1px solid rgba(232,230,223,0.5);"></div>
-  <div style="position:relative;">
-    <div class="mono" style="font-size:10px;letter-spacing:0.22em;color:rgba(232,230,223,0.55);margin-bottom:18px;">[ TRANSMISSION ENDS ]</div>
-    <h2 style="font-size:44px;letter-spacing:-0.035em;line-height:1;margin-bottom:16px;font-weight:500;">Wishlist now.</h2>
-    <p style="font-size:13px;color:rgba(232,230,223,0.7);margin-bottom:24px;">Get notified the moment Camoflux releases.</p>
-    <a href="{SITE['steam_url']}" target="_blank" class="btn-primary">WISHLIST ON STEAM →</a>
-  </div>
-</section>
-
-<footer style="padding:32px 24px;background:#0a0b0d;border-top:0.5px solid rgba(232,230,223,0.1);" class="mono">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-    <div class="rec-dot" style="width:6px;height:6px;background:#d8ff3a;border-radius:50%;"></div>
-    <div style="font-size:11px;font-weight:500;letter-spacing:0.05em;">CAMOFLUX <span style="color:rgba(232,230,223,0.4);">/ LEVELS &amp; BOSSES</span></div>
-  </div>
-  <div style="color:rgba(232,230,223,0.45);font-size:9px;line-height:1.7;letter-spacing:0.05em;margin-bottom:24px;">© LEVELS &amp; BOSSES · OTRO INVENTARIO</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
-    <div>
-      <div style="font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:10px;">[ FOLLOW ]</div>
-      <div style="font-size:10px;line-height:1.9;color:rgba(232,230,223,0.7);letter-spacing:0.05em;">
-        <a href="{SOCIAL['youtube']}" target="_blank">YOUTUBE</a><br/>
-        <a href="{SOCIAL['instagram']}" target="_blank">INSTAGRAM</a><br/>
-        <a href="{SOCIAL['x']}" target="_blank">X / THREADS</a><br/>
-        <a href="{SOCIAL['tiktok']}" target="_blank">TIKTOK</a>
-      </div>
-    </div>
-    <div>
-      <div style="font-size:9px;letter-spacing:0.18em;color:rgba(232,230,223,0.4);margin-bottom:10px;">[ CONTACT ]</div>
-      <div style="font-size:10px;line-height:1.9;color:rgba(232,230,223,0.7);letter-spacing:0.05em;">PRESS@<br/>LEVELSANDBOSSES<br/>.COM</div>
-    </div>
-  </div>
-</footer>"""
-
-    full_body = f"""<div class="preview-wrapper">
-  <div class="preview-label">CAMOFLUX · MOBILE PREVIEW · 414 × 920</div>
-  <div class="phone-frame">
-    <div class="phone-content" id="content">
-      {body_inner}
-    </div>
-  </div>
-</div>
-
-<script>
-const reveals = document.querySelectorAll('.reveal');
-const root = document.getElementById('content');
-const io = new IntersectionObserver((entries) => {{
-  entries.forEach(e => {{
-    if (e.isIntersecting) {{
-      e.target.classList.add('in');
-      io.unobserve(e.target);
-    }}
-  }});
-}}, {{ threshold: 0.1, rootMargin: '0px', root: root }});
-reveals.forEach(el => io.observe(el));
-
-const btn = document.getElementById('menu-btn');
-const menu = document.getElementById('menu');
-btn.addEventListener('click', () => {{
-  btn.classList.toggle('open');
-  menu.classList.toggle('open');
-}});
-menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {{
-  btn.classList.remove('open');
-  menu.classList.remove('open');
-}}));
-
-if (window.innerWidth <= 480) {{
-  document.body.classList.add('standalone-mobile');
-}}
-</script>"""
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>{SITE['title']} — Mobile</title>
-<meta name="description" content="{SITE['description_short']}">
-<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16.png">
-<link rel="apple-touch-icon" sizes="180x180" href="images/favicon-180.png">
-<meta property="og:title" content="{SITE['title']} — {SITE['subtitle']}">
-<meta property="og:description" content="{SITE['description_short']}">
-<meta property="og:image" content="images/og.jpg">
-<link rel="preload" as="image" href="images/cavern.jpg" fetchpriority="high">
-{fonts()}
-<style>{mobile_css}</style>
-</head>
-<body>
-{full_body}
-</body>
-</html>"""
+def build_studio():
+    items = "".join(f'<figure class="painting"><img src="{img_path(k, "main")}" alt="{e(ARTWORK[k]["alt"])}" loading="lazy"><figcaption class="t-meta">{acc(e(ARTWORK[k]["caption"]))}</figcaption></figure>'
+                    for k in PAINTINGS if check_image(k) is None)
+    sketch = "".join(f'<figure class="painting sketch">{media(k, ar="4x3", size="main")}<figcaption class="t-meta">{acc(e(ARTWORK[k]["caption"]))}</figcaption></figure>' for k in SKETCHBOOK)
+    body = (page_head("Studio", STUDIO["name"], STUDIO["short"])
+            + section(split("Paintings", f'<div class="stack-lg">{prose([e(STUDIO["paintings_intro"])])}<div class="paintings">{items}</div></div>'), id_="paintings")
+            + section(split("Drawings", f'<div class="grid grid--3">{sketch}</div>'), id_="drawings")
+            + section(split("About", f'<div class="stack">{prose(STUDIO["long"])}{link(STUDIO["site"], "leonardocastaneda.com")}</div>'), id_="about")
+            + section(split("Team", '<div class="rows">' + "".join(f'<div><div><h3 class="t-h3">{e(p["name"])}</h3></div>{meta(p["role"])}</div>' for p in STUDIO.get("team", [])) + '</div>'), id_="team"))
+    return page_shell("studio", f"Studio, {SITE['full_title']}", body)
 
 
-# ---- Run ----
+def build_hero_preview():
+    """The homepage hero on its own, for sharing as a link. Not linked from the site."""
+    idx = build_index()
+    start = idx.index('<main id="main">') + len('<main id="main">')
+    end = idx.index('</main>')
+    body_html = idx[start:end]
+    cut = body_html.index('<div class="wrap"><dl class="facts">')
+    return idx[:start] + body_html[:cut] + facts_bar() + idx[end:]
 
-def write(name, html):
-    path = OUT / name
-    with open(path, "w") as f:
-        f.write(html)
-    print(f"  ✓ {name}  ({len(html)/1024:.0f} kb)")
-    return path
 
-print(f"Building Camoflux site...")
-print(f"  Output dir: {OUT}")
-print()
+def build_mobile_preview():
+    """Design harness: shows the real, responsive index.html at phone size."""
+    return '''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Camoflux, mobile preview</title>
+<script>if (window.innerWidth < 600) location.replace('index.html');</script>
+<link rel="stylesheet" href="assets/site.css">
+<style>
+body { min-height: 100vh; display: flex; flex-direction: column; align-items: center; gap: var(--s-4); padding: var(--s-6); background: var(--c-surface); }
+.phone { width: 406px; height: 860px; border: 8px solid var(--c-surface-2); border-radius: 48px; overflow: hidden; background: var(--c-bg); }
+.phone iframe { width: 390px; height: 844px; border: 0; display: block; }
+</style></head><body>
+<p class="t-meta">Mobile preview, 390 × 844. This frames the live index.html; there is no separate mobile build.</p>
+<div class="phone"><iframe src="index.html" title="Mobile preview of the Camoflux homepage"></iframe></div>
+</body></html>'''
 
-write("index.html", build_homepage())
-write("presskit.html", build_presskit())
-write("exhibition.html", build_exhibition())
-write("devlog.html", build_devlog_index())
-write("merch.html", build_merch())
-write("mobile.html", build_mobile())
+# ---------------------------------------------------------------- press kit archive
 
-print("  Devlog posts:")
-for post in DEVLOG:
-    write(f"devlog-{post['id']}.html", build_devlog_post(post))
+def build_press_zip():
+    dl = OUT / "downloads"
+    dl.mkdir(parents=True, exist_ok=True)
+    fact = [f"# {SITE['full_title']}", "", SITE["description_50"], "",
+            f"Developer: {STUDIO['name']} ({STUDIO['lead']})", f"Publisher: {SITE['publisher']}",
+            f"Genre: {SITE['genre']}", f"Status: {SITE['status']}", f"Release: {SITE['release']}",
+            f"Platform: {SITE['platform']}", f"Engine: {SITE['engine']}", f"Steam: {SITE['steam_url']}",
+            f"Trailer: https://www.youtube.com/watch?v={SITE['youtube_id']}",
+            f"Press contact: {SITE.get('press_email') or 'n/a'}", "", "## Description", "", *SITE["description_150"], "",
+            "## Studio", "", *[re.sub('<[^>]+>', '', p) for p in STUDIO["long"]], "", "## Image captions", "",
+            *[f"{k}.jpg: {v['caption']}" for k, v in GAME_IMAGES.items()]]
+    with zipfile.ZipFile(dl / "camoflux-press-kit.zip", "w", zipfile.ZIP_STORED) as z:
+        z.writestr("camoflux-press-kit/fact-sheet.md", "\n".join(fact))
+        for key in GAME_IMAGES:
+            z.write(IMG_DIR / f"{key}-master.jpg", f"camoflux-press-kit/screenshots/{key}.jpg")
+        for name in ("logo-white.png", "logo-black.png"):
+            z.write(IMG_DIR / name, f"camoflux-press-kit/logo/{name}")
 
-# Sync images/ from project root into site/images/
-import shutil
-src_images = ROOT / 'images'
-dst_images = OUT / 'images'
-if src_images.exists():
-    if dst_images.exists():
-        shutil.rmtree(dst_images)
-    shutil.copytree(src_images, dst_images)
-    n_files = len(list(dst_images.iterdir()))
-    total = sum(f.stat().st_size for f in dst_images.iterdir() if f.is_file())
-    print(f"  ✓ images/  ({n_files} files, {total/1024/1024:.2f} MB)")
-else:
-    print(f"  ! images/ not found at {src_images} — run export_images.py first")
+# ---------------------------------------------------------------- lint
 
-print()
-print("Build complete.")
+def lint():
+    problems = list(ERRORS)
+    for f in sorted(OUT.glob("*.html")):
+        s = f.read_text()
+        if "—" in s:
+            problems.append(f"{f.name}: contains an em dash")
+        for bad in re.findall(r'href="(#?)"', s):
+            problems.append(f"{f.name}: empty or '#' link")
+        for tag in re.findall(r"<img\b[^>]*>", s):
+            if "alt=" not in tag:
+                problems.append(f"{f.name}: <img> without alt")
+        for ref in set(re.findall(r'(?:src|href|data-src)="((?:images|assets|downloads)/[^"]+)"', s)):
+            if not (OUT / ref).exists():
+                problems.append(f"{f.name}: missing file {ref}")
+        for ref in set(re.findall(r'href="([a-z0-9-]+\.html)(?:#[^"]*)?"', s)):
+            if not (OUT / ref).exists():
+                problems.append(f"{f.name}: broken page link {ref}")
+        if re.search(r'style="(?!--i:|background-image:url)', s):
+            problems.append(f"{f.name}: inline style outside the allowed set")
+    return problems
+
+# ---------------------------------------------------------------- run
+
+def main():
+    if OUT.exists():
+        shutil.rmtree(OUT)
+    OUT.mkdir()
+    shutil.copytree(IMG_DIR, OUT / "images", ignore=shutil.ignore_patterns("manifest.json"))
+    shutil.copytree(ROOT / "assets", OUT / "assets")
+    build_press_zip()
+
+    pages = {
+        "index.html": build_index(),
+        "presskit.html": build_presskit(),
+        "exhibitions.html": build_exhibitions(),
+        "studio.html": build_studio(),
+        "hero-preview.html": build_hero_preview(),
+        "devlog.html": build_devlog_index(),
+        "merch.html": build_merch(),
+        "mobile.html": build_mobile_preview(),
+    }
+    posts = published()
+    for p in posts:
+        pages[f"devlog-{p['id']}.html"] = build_devlog_post(p, posts)
+    for name, markup in pages.items():
+        (OUT / name).write_text(markup)
+        print(f"  {name:40s} {len(markup)/1024:5.0f} KB")
+
+    problems = lint()
+    total = sum(f.stat().st_size for f in OUT.rglob("*") if f.is_file())
+    print(f"\n  site/ total {total/1024/1024:.1f} MB")
+    if problems:
+        print("\nLint problems:")
+        for p in problems:
+            print("  -", p)
+        sys.exit(1)
+    print("  lint: no em dashes, no dead links, all images present, all alt text set")
+
+# ---------------------------------------------------------------- standalone previews
+# Chat previews and email attachments open one HTML file on its own, without the
+# assets/ and images/ folders beside it, which renders as an unstyled white page.
+# These copies inline the stylesheet, script, and images so each file works alone.
+# Deploy site/, not preview/.
+
+import base64
+
+def data_uri(path):
+    mime = {".png": "image/png", ".jpg": "image/jpeg", ".glb": "model/gltf-binary", ".js": "text/javascript", ".mp4": "video/mp4", ".webm": "video/webm",
+            ".otf": "font/otf", ".woff2": "font/woff2"}.get(path.suffix, "application/octet-stream")
+    return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
+
+def build_previews():
+    prev = ROOT / "preview"
+    if prev.exists():
+        shutil.rmtree(prev)
+    prev.mkdir()
+    css = (ROOT / "assets" / "site.css").read_text()
+    # CSS urls are relative to assets/; embed them so the inlined stylesheet still resolves.
+    for p in sorted(set(re.findall(r"url\(['\"]?((?:ui|fonts)/[^'\")]+)", css))):
+        css = css.replace(p, data_uri(ROOT / "assets" / p))
+    js = (ROOT / "assets" / "site.js").read_text()
+    for f in sorted(OUT.glob("*.html")):
+        s = f.read_text()
+        s = s.replace('<link rel="stylesheet" href="assets/site.css">', f"<style>{css}</style>")
+        # Lazy images resolve through one map, so each image is embedded once.
+        lazy = sorted(set(re.findall(r'data-(?:src|fallback)="(images/[^"]+)"', s)))
+        img_map = {p: data_uri(OUT / p) for p in lazy if (OUT / p).exists()}
+        s = s.replace('<script src="assets/site.js" defer></script>',
+                      f"<script>window.__IMG={json.dumps(img_map)};</script><script>{js}</script>")
+        # Direct references (logo, hero, CTA) are inlined in place.
+        for p in sorted(set(re.findall(r'(?:src="|url\()(images/[^")]+)', s))):
+            if (OUT / p).exists():
+                s = s.replace(f'src="{p}"', f'src="{data_uri(OUT / p)}"').replace(f"url({p})", f"url({data_uri(OUT / p)})")
+        # 3D config: use the quantized models (they need no WebAssembly, which some hosts block),
+        # drop the now-duplicate fallbacks, and keep only MP4 clips, to stay small.
+        if "CAMOFLUX_HERO" in s:
+            s = re.sub(r'"src": "assets/3d/([\w-]+)\.glb", "fallback": "assets/3d/\1\.q\.glb"', r'"src": "assets/3d/\1.q.glb"', s)
+            s = re.sub(r', "webm": "assets/3d/clips/[\w-]+\.webm"', "", s)
+            s = s.replace('"https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/libs/meshopt_decoder.js", ', '')
+        # The engine goes in as an inline script body, since hosts often block data: scripts.
+        eng_file = next((f for f in ("hero3d-levels.js", "hero3d.js") if f'"assets/{f}"' in s), None)
+        if eng_file:
+            eng = (ROOT / "assets" / eng_file).read_text().replace("</script", "<\\/script")
+            s = s.replace(f'"assets/{eng_file}"', '"inline:hero3d-src"')
+            s = s.replace("</body>", f'<script type="text/plain" id="hero3d-src">{eng}</script>\n</body>')
+        # Screenshots named inside the 3D config (particles open into these) are embedded too.
+        if "window.CAMOFLUX_LEVELS" in s:
+            ci = s.index("window.CAMOFLUX_LEVELS"); ce = s.index("\n", ci)
+            line = s[ci:ce]
+            for p in sorted(set(re.findall(r'images/[\w.-]+\.jpg', line))):
+                if (ROOT / p).exists():
+                    line = line.replace(f'"{p}"', f'"{data_uri(ROOT / p)}"')
+            s = s[:ci] + line + s[ce:]
+        # 3D hero, HUD glyphs: every assets/ path the page names is embedded.
+        for p in sorted(set(re.findall(r'assets/(?:3d|ui)/[\w./-]+', s)), key=len, reverse=True):
+            if (ROOT / p).exists():
+                s = s.replace(p, data_uri(ROOT / p))
+        s = re.sub(r'<link rel="preload"[^>]*>', "", s)
+        (prev / f.name).write_text(s)
+        print(f"  preview/{f.name:32s} {len(s)/1024/1024:4.1f} MB")
+
+if __name__ == "__main__":
+    main()
+    build_previews()

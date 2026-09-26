@@ -1,131 +1,71 @@
-# Camoflux site — production bundle
+# Camoflux site
 
-## Folder structure
-
-```
-camoflux-site/
-├── README.md
-├── content.py           ← single source of truth for all content
-├── build.py             ← run this to regenerate HTML
-├── export_images.py     ← run this to (re-)generate image variants
-├── images_src/          ← original PNGs (not deployed; keep for re-export)
-│   ├── cavern.png       ← 1920×1080 source
-│   ├── igapo.png
-│   └── mangrove.png
-├── images/              ← exported JPG variants + favicons + OG
-│   ├── cavern.jpg          ← 1920w main hero/feature
-│   ├── cavern-sm.jpg       ← 960w for cards & mobile
-│   ├── cavern-master.jpg   ← 1920w q92, press kit downloads
-│   ├── igapo.jpg / -sm / -master
-│   ├── mangrove.jpg / -sm / -master
-│   ├── og.jpg              ← 1200×630 social sharing
-│   ├── trailer-thumb.jpg   ← 1280×720 local trailer fallback
-│   └── favicon-{16,32,180,512}.png
-└── site/                ← deploy this folder
-    ├── index.html
-    ├── presskit.html
-    ├── exhibition.html
-    ├── devlog.html
-    ├── devlog-*.html
-    ├── merch.html
-    ├── mobile.html
-    └── images/          ← auto-copied by build.py from ../images/
-```
+Static site for Camoflux: Levels & Bosses. Content lives in one file, styling in one design system, and the build checks its own output.
 
 ## Workflow
 
 ```bash
-# First-time setup or after adding new source images:
-python3 export_images.py    # exports PNGs → JPG variants + favicons + OG
-
-# Any content change:
-python3 build.py            # regenerates site/ HTML + syncs images
+python3 export_images.py   # after adding or changing anything in images_src/
+python3 build.py           # after any content change; regenerates site/ and lints it
 ```
 
-## File size breakdown
+Deploy the contents of `site/` to any static host.
+
+`build.py` also writes `preview/`: the same pages with the stylesheet, script, and images embedded, so each file opens correctly on its own (in a chat preview, an email attachment, or double-clicked from a download). They are 1 to 4 MB each, so use them for review only. Pages in `site/` load their styles and images from the folders beside them; opened alone, they render as a plain white page.
+
+## Folder structure
 
 ```
-HTML total:            ~210 KB  (10 pages combined)
-Images dir total:      ~2.3 MB
-  cavern.jpg            290 KB  main hero
-  cavern-sm.jpg          84 KB  card variant
-  cavern-master.jpg     400 KB  press kit master
-  (igapo, mangrove similar)
-  og.jpg                 78 KB  social sharing card
-  trailer-thumb.jpg     150 KB  local trailer fallback
-  favicons             total < 10 KB
+content.py          all copy, links, images, devlog, exhibitions, merch
+build.py            page templates built from small components, plus lint
+export_images.py    images_src/ to images/ (3 sizes, logo variants, OG card, favicons)
+assets/site.css     design system: tokens first, then components
+assets/site.js      lazy images with skeletons, trailer modal, menu, carousels, form states
+images_src/         original files, keep for re-export
+images/             generated
+site/               generated, deploy this
 ```
 
-Compared to the inlined-base64 previews (1–2 MB per HTML file), this is **~100× lighter per page**, and the browser only loads images visible to the user.
+## Design system (assets/site.css)
 
-## How images are wired in
+Every value in the stylesheet references a token defined at the top.
 
-Each image has three variants:
+| Token group | Values |
+| --- | --- |
+| Color | bg, surface, surface-2, line, line-strong, text (3 levels), accent #d8ff3a |
+| Type scale | 11 meta, 13 small, 16 body, 20 lead, 22 h3, 28 to 40 h2, 36 to 56 h1, 40 to 80 display (hero only) |
+| Weights | 400 and 500 only |
+| Line height | 1.05 headings, 1.35 h3 and quotes, 1.6 all running text |
+| Spacing | 4px base: 4, 8, 12, 16, 24, 32, 48, 64, 96, 128 |
+| Radius | 0 (surfaces, media, buttons), 2px (badges, inputs), round (dots, circular controls) |
+| Motion | ease-out cubic-bezier(0.2, 0.6, 0.2, 1), 160 / 280 / 700ms, 90ms stagger, 3px max lift |
 
-| Variant | Width | Quality | Use case | Approx size |
-| --- | --- | --- | --- | --- |
-| `name.jpg` | 1920 | 85 | Hero, full-bleed, exhibition page | 200-350 KB |
-| `name-sm.jpg` | 960 | 82 | Feature cards, devlog index, merch grid, mobile | 65-95 KB |
-| `name-master.jpg` | 1920 | 92 | Press kit downloads (high quality) | 280-500 KB |
+Rules:
 
-In `build.py`:
+- Chartreuse is the only accent. It marks actions and current state, nothing decorative.
+- Motion: one entrance sequence on the homepage hero. Everything else animates only in response to the visitor (hover, open, load).
+- Links that leave the site open in a new tab and carry ↗. Internal links carry no arrow.
+- Numbered markers appear only on real sequences (the water arc: páramo, igapó, mangrove).
 
-```python
-img("cavern")            # → "images/cavern.jpg"
-img("cavern", "small")   # → "images/cavern-sm.jpg"
-img("cavern", "master")  # → "images/cavern-master.jpg"
+## What the build enforces
 
-IMAGES['cavern']         # main version (shorthand)
-IMAGES_SM['cavern']      # small version (shorthand)
-```
+`build.py` fails if any page has an em dash, an empty or `#` link, an image without alt text, a missing image or asset, a link to a page that does not exist, or an inline style outside the allowed set. A link whose URL is `None` in content.py is simply not rendered, so placeholders never ship as dead buttons.
 
-Hero contexts use `IMAGES[…]`. Card/grid contexts use `IMAGES_SM[…]`.
+## Common edits
 
-## Adding a new image
+- **Release date:** `SITE["release"]`
+- **Hero video loop:** put an MP4 in `site/video/` (or add a copy step) and set `SITE["hero_video"]`
+- **Mailchimp signup:** configured in `SITE["mailchimp"]` from your embed code. It appears above the footer on every page and submits in place, showing submitting, success, and error states with Mailchimp's own message. Without JavaScript it falls back to a normal Mailchimp form in a new tab.
+- **Devlog post:** add a dict to the top of `DEVLOG`; `"draft": True` keeps it out of the build
+- **Merch item for sale:** set `status` to `"available"`, plus `price` and `url`; available items also appear on the homepage
+- **New image:** drop the file in `images_src/`, run `export_images.py`, add a caption and alt text to `IMAGES`
 
-1. Drop the source PNG into `images_src/` (e.g. `images_src/cavern2.png`)
-2. Re-run the image-export step (see `export_images.py` below — or run the snippet manually)
-3. Reference it in `content.py`: `"image": "cavern2"`
-4. Run `python3 build.py`
+Search content.py for `# CONFIRM` to find every placeholder or unverified value.
 
-## Image export snippet
+## Void Signal (current direction)
 
-```python
-from PIL import Image
-import os
-
-configs = {
-    'main':   {'width': 1920, 'quality': 85, 'suffix': ''},
-    'small':  {'width': 960,  'quality': 82, 'suffix': '-sm'},
-    'master': {'width': 1920, 'quality': 92, 'suffix': '-master'},
-}
-for name in ['cavern', 'igapo', 'mangrove']:  # add new keys here
-    src = Image.open(f'images_src/{name}.png').convert('RGB')
-    sw, sh = src.size
-    for cfg in configs.values():
-        w = cfg['width']
-        h = int(sh * w / sw)
-        img = src.resize((w, h), Image.LANCZOS) if w != sw else src
-        out = f'images/{name}{cfg["suffix"]}.jpg'
-        img.save(out, 'JPEG', quality=cfg['quality'], optimize=True, progressive=True)
-```
-
-## Deploying
-
-1. Run `python3 build.py`
-2. Copy `images/` into `site/images/` (or symlink during dev)
-3. Upload the contents of `site/` to your web host
-
-Works on any static host — Netlify, Vercel, Cloudflare Pages, GitHub Pages, S3, plain Apache/nginx. No build step required server-side.
-
-## Further optimization (when ready)
-
-- **WebP**: emit `.webp` alongside `.jpg`, use `<picture>` tags. ~30% smaller for equivalent quality. Browser support is now universal.
-- **AVIF**: even better compression than WebP, ~95% browser support. Worth adding as a third format.
-- **Lazy load**: convert CSS `background-image` to `<img loading="lazy">` for non-hero images. Major bandwidth savings on long-scroll pages like the press kit screenshot grid.
-- **CDN**: serve images through Cloudflare or similar. Free tier handles this site comfortably.
-- **Preconnect**: already added for fonts.googleapis.com; consider adding for img.youtube.com if you keep the trailer thumbnail remote.
-
-## Content updates
-
-See workflow in earlier README — edit `content.py`, run `python3 build.py`. The image references and file sizes all stay consistent automatically.
+- **Ground:** the inverted 2012 Void Construction ink drawing tiles behind every page (`assets/ui/ground-ink.jpg`); all content sits on black panels. Every overlay is pure black.
+- **Type:** Technical Standard VP for headings (self-hosted from `assets/fonts/`; needs a web license), Inter for reading, Inter Italic for press quotes, AB-24h for metadata. AB-24h comes from Adobe Fonts: set `SITE["fonts"]["adobe_kit_id"]` to your web project's kit ID. Until then Share Tech Mono stands in. The build marks accented letters so AB-24h's missing á, ó, í are set in Technical Standard at matching height.
+- **3D hero:** `assets/hero3d.js` renders the model named in `SITE["hero3d"]` in front of a curved screen of in-game frames (`assets/3d/frames/`). Set `SITE["hero_video"]` to an MP4 gameplay clip to play video on that screen instead. three.js loads after the page, from jsDelivr, and is skipped with reduced motion, data saver, or no WebGL; the poster `images/hero-3d-still.jpg` shows instead.
+- **Swapping the hero model:** convert FBX with FBX2glTF, compress with `gltf-transform meshopt`, drop the `.glb` in `assets/3d/`, and set `SITE["hero3d"]["model"]`.
+- **Artwork:** paintings, drawings, and installation photos live in `ARTWORK` in content.py (with photo credits) and appear on `studio.html`, the homepage sketchbook, and the Exhibitions page. They are not part of the press kit screenshots.
