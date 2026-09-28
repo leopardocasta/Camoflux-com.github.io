@@ -96,7 +96,11 @@ def media(key, ar="16x9", size="sm", badge="", badge_right="", src=None, alt=Non
     b = f'<span class="badge t-meta">{e(badge)}</span>' if badge else ""
     br = f'<span class="badge badge--right t-meta">{e(badge_right)}</span>' if badge_right else ""
     fb = f' data-fallback="{e(fallback)}"' if fallback else ""
-    return (f'<div class="media ar-{ar}" data-src="{e(src)}"{fb}>{b}{br}'
+    full = ""
+    if key and key in ALL_IMAGES:   # click to open large (site.js lightbox)
+        cap = ALL_IMAGES[key].get("caption", ""); cr = ALL_IMAGES[key].get("credit", "")
+        full = f' data-full="{e(img_path(key, "main"))}" data-caption="{e(cap + (". " + cr if cr else ""))}"'
+    return (f'<div class="media ar-{ar}" data-src="{e(src)}"{fb}{full}>{b}{br}'
             f'<div class="media__img" role="img" aria-label="{e(alt)}"></div>'
             f'<div class="media__status">{meta("Image unavailable")}</div>'
             f'<noscript><img src="{e(src)}" alt="{e(alt)}"></noscript></div>')
@@ -265,6 +269,9 @@ def page_shell(page, title, body, description=None, preload=None, modal=False):
 {body}
 </main>
 {footer()}
+<div class="shotbox" id="lightbox" data-open="false" role="dialog" aria-modal="true" aria-label="Image">
+  <div class="shotbox__frame"><button class="shotbox__close btn btn--ghost btn--sm">Close</button><div class="shotbox__stage"></div><p class="shotbox__cap t-meta"></p></div>
+</div>
 {trailer_modal() if modal else ""}
 <script src="assets/site.js" defer></script>
 {hero3d_scripts() if page == "index" else ""}
@@ -310,11 +317,13 @@ def hero3d_scripts():
     cfg = {
         "icons": [{"id": x["id"], "label": x["label"], "src": f"assets/3d/{x['model']}", "height": x["height"],
                    "pano": f"assets/3d/pano/{x['pano']}.mp4", "panoPoster": f"assets/3d/pano/{x['pano']}.jpg"} for x in lv["icons"]],
-        "figure": {"label": "The Other", "src": f"assets/3d/{lv['figure']}", "scale": 1.25, "lie": False},
+        "figure": {"label": "The Other", "src": f"assets/3d/{lv['figure']}", "scale": 1.25, "lie": False,
+                   **({"video": f"assets/3d/clips/{lv['figure_video']}.mp4", "poster": f"assets/3d/clips/{lv['figure_video']}.jpg",
+                       "videoCaption": lv.get("figure_video_caption", "Gameplay")} if lv.get("figure_video") else {})},
         "tex": {"void": "assets/3d/void.jpg", "voidN": "assets/3d/void-n.jpg", "ground": "assets/3d/ground.jpg", "groundN": "assets/3d/ground-n.jpg"},
         "shots": [{"src": img_path(k, "sm"), "caption": IMAGES[k]["caption"]} for k in lv["shots"]],
     }
-    for f in [*(x["src"] for x in cfg["icons"]), *(x["pano"] for x in cfg["icons"]), *(x["panoPoster"] for x in cfg["icons"]), cfg["figure"]["src"], *cfg["tex"].values()]:
+    for f in [*(x["src"] for x in cfg["icons"]), *(x["pano"] for x in cfg["icons"]), *(x["panoPoster"] for x in cfg["icons"]), cfg["figure"]["src"], *([cfg["figure"]["video"], cfg["figure"]["poster"]] if cfg["figure"].get("video") else []), *cfg["tex"].values()]:
         if not (ROOT / f).exists():
             ERRORS.append(f"3D hero asset missing: {f}")
     libs = ["https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js",
@@ -367,8 +376,14 @@ def press_block():
     rest = rail("quotes quotes--3", "".join(quote_card(q, small=True) for q in PRESS_SHORT), "More press")
     return f'<div class="stack-lg">{top}{rest}</div>'
 
+def clip_media(n, label, ar="2x1"):
+    return (f'<div class="media ar-{ar} clip-wrap"><video class="clip" muted loop playsinline preload="none" poster="assets/3d/clips/{n}.jpg" aria-label="{e(label)}">'
+            + (f'<source src="assets/3d/clips/{n}.webm" type="video/webm">' if (ROOT / f"assets/3d/clips/{n}.webm").exists() else "")
+            + f'<source src="assets/3d/clips/{n}.mp4" type="video/mp4"></video></div>')
+
 def feature_card(f):
-    return (f'<article class="card">{media(f["image"])}'
+    m = clip_media(f["clip"], f["title"]) if f.get("clip") else media(f["image"], ar="2x1")
+    return (f'<article class="card">{m}'
             f'{meta(f["category"])}<h3 class="t-h3">{e(f["title"])}</h3>'
             f'<p class="t-small">{e(f["body"])}</p></article>')
 
@@ -548,7 +563,7 @@ def build_exhibitions():
             + section(split("Upcoming", up), id_="upcoming")
             + section(split("2026", featured), id_="whitney", alt=True)
             + section(split("History", f'<div class="stack-lg"><div class="rows">{past}</div>'
-                            f'<figure class="history-photo">{media("supercon-performance", ar="16x9", size="main")}<figcaption class="t-meta">{acc(e(ARTWORK["supercon-performance"]["caption"]))}. {e(ARTWORK["supercon-performance"]["credit"])}</figcaption></figure></div>')))
+                            f'<figure class="history-photo">{media("supercon-performance", ar="16x9", size="main")}<figcaption class="t-meta">{acc(e(ARTWORK["supercon-performance"]["caption"]))}{(". " + e(ARTWORK["supercon-performance"]["credit"])) if ARTWORK["supercon-performance"].get("credit") else ""}</figcaption></figure></div>')))
     return page_shell("exhibitions", f"Exhibitions and playtesting, {SITE['full_title']}", body)
 
 
@@ -588,7 +603,7 @@ def build_merch():
 
 
 def build_studio():
-    items = "".join(f'<figure class="painting"><img src="{img_path(k, "main")}" alt="{e(ARTWORK[k]["alt"])}" loading="lazy"><figcaption class="t-meta">{acc(e(ARTWORK[k]["caption"]))}</figcaption></figure>'
+    items = "".join(f'<figure class="painting"><img src="{img_path(k, "main")}" alt="{e(ARTWORK[k]["alt"])}" loading="lazy" data-full="{img_path(k, "main")}" data-caption="{e(ARTWORK[k]["caption"])}"><figcaption class="t-meta">{acc(e(ARTWORK[k]["caption"]))}</figcaption></figure>'
                     for k in PAINTINGS if check_image(k) is None)
     sketch = "".join(f'<figure class="painting sketch">{media(k, ar="4x3", size="main")}<figcaption class="t-meta">{acc(e(ARTWORK[k]["caption"]))}</figcaption></figure>' for k in SKETCHBOOK)
     body = (page_head("Studio", STUDIO["name"], STUDIO["short"])
@@ -731,7 +746,7 @@ def build_previews():
         s = f.read_text()
         s = s.replace('<link rel="stylesheet" href="assets/site.css">', f"<style>{css}</style>")
         # Lazy images resolve through one map, so each image is embedded once.
-        lazy = sorted(set(re.findall(r'data-(?:src|fallback)="(images/[^"]+)"', s)))
+        lazy = sorted(set(re.findall(r'data-(?:src|fallback|full)="(images/[^"]+)"', s)))
         img_map = {p: data_uri(OUT / p) for p in lazy if (OUT / p).exists()}
         s = s.replace('<script src="assets/site.js" defer></script>',
                       f"<script>window.__IMG={json.dumps(img_map)};</script><script>{js}</script>")

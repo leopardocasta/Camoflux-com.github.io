@@ -31,6 +31,29 @@
     media.forEach(loadMedia);
   }
 
+  /* ---- Lightbox: every image opens large on click (or Enter), except inside links ---- */
+  const lb = document.getElementById('lightbox');
+  if (lb) {
+    const stage = lb.querySelector('.shotbox__stage'), capEl = lb.querySelector('.shotbox__cap'), closeBtn = lb.querySelector('button');
+    let lastFocus = null;
+    const open = (src, cap, alt) => {
+      lastFocus = document.activeElement; stage.innerHTML = '';
+      stage.appendChild(Object.assign(document.createElement('img'), { src, alt: alt || cap || '' }));
+      capEl.textContent = cap || ''; lb.dataset.open = 'true'; document.body.style.overflow = 'hidden'; closeBtn.focus();
+    };
+    const close = () => { lb.dataset.open = 'false'; stage.innerHTML = ''; document.body.style.overflow = ''; if (lastFocus) lastFocus.focus(); };
+    const zoomables = $$('[data-full]').filter((el) => !el.closest('a'));
+    zoomables.forEach((el) => {
+      el.classList.add('is-zoomable'); el.setAttribute('tabindex', '0'); el.setAttribute('role', 'button');
+      el.setAttribute('aria-label', 'Open image: ' + (el.dataset.caption || el.getAttribute('alt') || ''));
+      const go = () => { const img = el.querySelector('.media__img'); open((window.__IMG && window.__IMG[el.dataset.full]) || el.dataset.full, el.dataset.caption, img ? img.getAttribute('aria-label') : el.getAttribute('alt')); };
+      el.addEventListener('click', go);
+      el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); } });
+    });
+    lb.addEventListener('click', (ev) => { if (ev.target === lb || ev.target.closest('button')) close(); });
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && lb.dataset.open === 'true') close(); });
+  }
+
   /* ---- Gameplay clips: play only while on screen ---- */
   const clips = $$('video.clip');
   clips.forEach((v) => $$('source', v).forEach((s) => {   // embedded clips in previews play from blob: URLs

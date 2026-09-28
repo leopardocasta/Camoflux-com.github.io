@@ -11,7 +11,7 @@
 SITE = {
     "title": "Camoflux",
     "subtitle": "Levels & Bosses",
-    "full_title": "Camoflux: Levels & Bosses",
+    "full_title": "Camoflux",
     "genre": "Ecological stealth-exploration game",
     "tagline": "Where landscape, body, and technology fuse.",
     "lead": "A hand-painted, ecological stealth-exploration game. Camouflage through neo-primordial landscapes and solve environmental puzzles to reshape a cyclical cataclysm.",
@@ -33,15 +33,16 @@ SITE = {
     "hero_video": None,                  # optional gameplay clip (MP4); plays on the screen behind the 3D model when set
     # 3D hero: model in front of in-game footage. Files live in assets/3d/.
     # Homepage hero: one floating icon per level; hovering shows that level's 360 video (assets/3d/pano/).
-    # Machine Mangrove Village uses the Level One loop until its own 360 is ready.  # CONFIRM when the new video arrives
     "hero_levels": {
         "icons": [
-            {"id": "mangrove", "label": "Machine Mangrove Village", "model": "hedge.q.glb", "height": 1.9, "pano": "level-one"},
+            {"id": "mangrove", "label": "Machine Mangrove Village", "model": "hedge.q.glb", "height": 1.9, "pano": "mangrove"},
             {"id": "level-one", "label": "Level One", "model": "l1-blob.q.glb", "height": 1.5, "pano": "first-boss"},
             {"id": "igapo", "label": "Incendio-Igapó", "model": "shield.q.glb", "height": 1.9, "pano": "amazon"},
             {"id": "paramo", "label": "Patterned Páramo", "model": "frailejon.q.glb", "height": 1.7, "pano": "paramo"},
         ],
         "figure": "other-morphs.q.glb",
+        # Hovering The Other plays this gameplay reel behind the scene; clicking opens it large with sound.
+        "figure_video": "gameplay", "figure_video_caption": "Gameplay",
         "shots": ["first-boss-render", "igapo-roots", "lily-pad-hangout", "walking-panorama", "cave-roots", "cave-figures",
                   "mangrove-village", "paramo", "igapo-butterfly-drone", "level-one"],
     },
@@ -145,7 +146,7 @@ ARTWORK = {
     "paint-level-01": {"kind": "painting", "caption": "Level 01, oil and ink on canvas, 2009", "alt": "Grey and white oil painting of clouds and rock, with the words LEVEL 0 at the bottom."},
     "draw-first-boss": {"kind": "drawing", "caption": "First Boss (agitado), ink drawing", "alt": "Ink drawing of a dark, flame-like mass rising to a small rectangular summit."},
     "draw-boss-intro": {"kind": "drawing", "caption": "The First Boss, intro page", "alt": "Comic page introducing the First Boss: a dark mountain topped by a doorway in pale fog, captioned THE FIRST BOSS and NO ESCAPE."},
-    "supercon-performance": {"kind": "photo", "caption": "Camoflux cosplay performance, Field Collisions, Florida Supercon, 2024", "credit": "Photo: Lauren Monzón", "alt": "Two performers in patterned camouflage costumes move through a convention hall crowd."},
+    "supercon-performance": {"kind": "photo", "caption": "Camoflux cosplay performance, Field Collisions, Florida Supercon, 2024", "credit": "", "alt": "Two performers in patterned camouflage costumes move through a convention hall crowd."},
     "whitney-visitors": {"kind": "photo", "caption": "Visitors at the controls, Whitney Biennial 2026", "credit": "Photo: Films About Artists", "alt": "Visitors gather around a sculptural controller stand, one pressing its button, in front of the painted wall."},
 }
 PAINTINGS = ["paint-mangrove-hedge", "paint-traveller", "paint-level-01", "paint-ink-2025", "paint-l1-flythrough", "paint-other-sensing"]
@@ -175,12 +176,15 @@ WORLD = {
 FEATURES = [
     {"category": "Camouflage", "title": "Become the landscape",
      "body": "Absorb textures from the environment and embody them. Camouflage is how you hide, solve stealth puzzles, and channel data across the worlds.",
-     "image": "level-one"},
+     "image": "level-one", "clip": "camouflage"},
     {"category": "Turbulence and light", "title": "Touch and light change matter",
      "body": "Modulate turbulence until a cloud is solid enough to walk across. Shift the frequency of light to solve atmospheric puzzles.",
-     "image": "igapo-butterfly-drone"},
+     "image": "igapo-butterfly-drone", "clip": "touch-bridge"},
+    {"category": "Intensify every ability", "title": "Choose coexistence or conquest",
+     "body": "Customize each ability to suit your gameplay style. Every encounter sits on a spectrum from violence to cooperation.",
+     "image": "first-boss-render", "clip": "coexistence"},
     {"category": "Craft", "title": "Painted into the engine",
-     "body": "Oil paintings and ink drawings become height maps, materials, and textures; one level is built from María Thereza Negreiros's Amazonian canvases. Models sculpted in VR become sentient, animated actors in Unreal Engine 5.",
+     "body": "Oil paintings and ink drawings become height maps, materials, and textures. Every model is a custom asset; one level is built from María Thereza Negreiros's Amazonian canvases. Models sculpted in VR become sentient, animated actors in Unreal Engine 5.",
      "image": "mangrove-entity"},
 ]
 

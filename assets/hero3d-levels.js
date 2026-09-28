@@ -64,7 +64,7 @@
   const toBlob = (u) => { if (!u || !u.startsWith('data:')) return u; const [h, b] = u.split(','); const bin = atob(b); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return URL.createObjectURL(new Blob([a], { type: h.slice(5).split(';')[0] })); };
   const panos = C.icons.map((ic) => {
     const v = document.createElement('video');
-    Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'auto', src: toBlob(ic.pano) });
+    Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none', src: toBlob(ic.pano) });   // fetched on first hover
     v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
     const t = new THREE.VideoTexture(v); t.encoding = THREE.sRGBEncoding;
     const poster = tl.load(ic.panoPoster); poster.encoding = THREE.sRGBEncoding;
@@ -74,6 +74,21 @@
   const sphere = new THREE.Mesh(new THREE.SphereGeometry(40, 64, 32), sphereMat);
   sphere.renderOrder = -1; scene.add(sphere);
   let panoIdx = -1, panoAmt = 0;
+
+  // The Other: hovering plays gameplay footage on a curved screen in front of the camera; clicking opens it large with sound.
+  let figVideo = null, figTex = null, figPoster = null, figScreen = null, figAmt = 0, figHover = false;
+  if (C.figure && C.figure.video) {
+    figVideo = document.createElement('video');
+    Object.assign(figVideo, { muted: true, loop: true, playsInline: true, preload: 'none', src: toBlob(C.figure.video) });
+    figVideo.setAttribute('muted', ''); figVideo.setAttribute('playsinline', '');
+    figTex = new THREE.VideoTexture(figVideo); figTex.encoding = THREE.sRGBEncoding;
+    figPoster = C.figure.poster ? tl.load(C.figure.poster) : null; if (figPoster) figPoster.encoding = THREE.sRGBEncoding;
+    [figTex, figPoster].forEach((t) => { if (t) { t.center.set(0.5, 0.5); t.repeat.set(-1, 1); } });   // seen from inside the arc
+    const arc = 0.9, R = 12, hgt = (R * arc) * 9 / 16;
+    figScreen = new THREE.Mesh(new THREE.CylinderGeometry(R, R, hgt, 48, 1, true, Math.PI - arc / 2, arc),
+      new THREE.MeshBasicMaterial({ map: figPoster || figTex, transparent: true, opacity: 0, side: THREE.DoubleSide, fog: false, toneMapped: false, depthWrite: false }));
+    figScreen.renderOrder = -1; figScreen.visible = false; scene.add(figScreen);
+  }
 
   // ---- icons ----
   const loader = new THREE.GLTFLoader();
@@ -211,6 +226,8 @@
     const h = pick(); hero.style.cursor = h && h.kind !== 'ground' ? 'pointer' : (h ? 'crosshair' : '');
     setHover(h && h.kind === 'icon' ? h.i : -1);
     hoverParticle = h && h.kind === 'particle' ? h.obj : null;
+    figHover = !!(h && h.kind === 'figure');
+    if (figVideo) { if (figHover) figVideo.play().catch(() => {}); else if (figAmt < 0.05) figVideo.pause(); }
     if (label) { if (h && h.kind === 'figure') { label.textContent = C.figure.label; label.dataset.show = 'true'; } else if (!(h && h.kind === 'icon')) label.dataset.show = 'false'; }
   });
   hero.addEventListener('pointerleave', () => { if (!touchPinned && holding < 0) setHover(-1); });
@@ -224,6 +241,9 @@
   const endHold = () => { if (holding < 0) return; holding = -1; hero.classList.remove('is-looking'); if (!touchPinned) setHover(-1); };
   addEventListener('pointerup', endHold); addEventListener('pointercancel', endHold);
   const box = $('shotbox');
+  const openVideo = (src, cap) => { if (!box) return; const st = box.querySelector('.shotbox__stage'); st.innerHTML = '';
+    const v = Object.assign(document.createElement('video'), { src: toBlob(src), controls: true, autoplay: true, playsInline: true }); st.appendChild(v);
+    box.querySelector('.shotbox__cap').textContent = cap; box.dataset.open = 'true'; box.querySelector('button').focus(); };
   const openLarge = (shot) => { if (!box) return; const st = box.querySelector('.shotbox__stage'); st.innerHTML = ''; st.appendChild(Object.assign(document.createElement('img'), { src: shot.userData.cap.src, alt: shot.userData.cap.caption })); box.querySelector('.shotbox__cap').textContent = shot.userData.cap.caption; box.dataset.open = 'true'; box.querySelector('button').focus(); };
   if (box) { box.addEventListener('click', (ev) => { if (ev.target === box || ev.target.closest('button')) { box.dataset.open = 'false'; box.querySelector('.shotbox__stage').innerHTML = ''; } }); document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') box.dataset.open = 'false'; }); }
   hero.addEventListener('click', (ev) => {
@@ -231,6 +251,7 @@
     if (!h) { if (touchPinned) { touchPinned = false; setHover(-1); } return; }
     if (h.kind === 'shot') openLarge(h.obj);
     if (h.kind === 'particle') { openShotAt(h.obj.position.clone()); place(h.obj, true); }
+    if (h.kind === 'figure' && C.figure.video) openVideo(C.figure.video, C.figure.videoCaption || 'Gameplay');
     if (h.kind === 'ground') { ripple(h.at); panVel.x += -h.at.x * 0.012; panVel.y += h.at.z * 0.012; }
     if (h.kind === 'icon' && ev.pointerType === 'touch') { touchPinned = hovered !== h.i || !touchPinned; setHover(touchPinned ? h.i : -1); }
   });
@@ -249,11 +270,19 @@
     if (holding < 0 && lookW < 0.02) { yaw *= 0.9; pitch *= 0.9; }
     if (panoIdx >= 0) { const p = panos[panoIdx]; sphereMat.map = p.v.readyState >= 2 ? p.t : p.poster; sphereMat.needsUpdate = true; }
     sphereMat.opacity = panoAmt; sphere.visible = panoAmt > 0.01;
+    if (figScreen) {
+      figAmt += ((figHover ? 1 : 0) - figAmt) * Math.min(1, dt * 3);
+      figScreen.visible = figAmt > 0.01; figScreen.position.copy(camera.position);
+      figScreen.material.opacity = figAmt * 0.95;
+      const live = figVideo.readyState >= 2 ? figTex : (figPoster || figTex);
+      if (figScreen.material.map !== live) { figScreen.material.map = live; figScreen.material.needsUpdate = true; }
+      if (!figHover && figAmt < 0.02 && !figVideo.paused) figVideo.pause();
+    }
     const fov = 38 + panoAmt * 29 + lookW * 8;   // widened view inside a 360, a third less than the first test
     if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
     sphere.position.copy(camera.position);   // the 360 wraps the camera, so it projects correctly
     sphere.rotation.y = pointer.x * 0.6 * (1 - lookW) + t * 0.01 * auto;
-    groundMat.opacity = 1 - panoAmt * 0.85; scene.fog.density = 0.06 * (1 - panoAmt * 0.8);
+    groundMat.opacity = 1 - Math.max(panoAmt * 0.85, figAmt * 0.7); scene.fog.density = 0.06 * (1 - panoAmt * 0.8);
 
     icons.forEach((ic, i) => {
       const u = ic.userData, on = hovered === i ? 1 : 0;
