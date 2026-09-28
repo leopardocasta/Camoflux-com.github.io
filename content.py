@@ -154,7 +154,7 @@ SKETCHBOOK = ["draw-other-sequence", "draw-first-boss", "draw-patterned-biome", 
 
 # Gameplay clips (from the GIFs) and wide stills, shown in the "In play" section.
 GAMEPLAY = {
-    "clips": [("igapo-swim", "Swimming, Igapó"), ("incendio-360", "Incendio Igapó 360")],
+    "clips": [("camouflage", "Camouflage ability, Machine Mangrove Village"), ("glide", "Glide ability")],
     "wide": "lily-pad-hangout",
 }
 
@@ -176,7 +176,7 @@ WORLD = {
 FEATURES = [
     {"category": "Camouflage", "title": "Become the landscape",
      "body": "Absorb textures from the environment and embody them. Camouflage is how you hide, solve stealth puzzles, and channel data across the worlds.",
-     "image": "level-one", "clip": "camouflage"},
+     "image": "level-one", "clip": "igapo-swim", "clip_caption": "Swimming, Igapó"},
     {"category": "Turbulence and light", "title": "Touch and light change matter",
      "body": "Modulate turbulence until a cloud is solid enough to walk across. Shift the frequency of light to solve atmospheric puzzles.",
      "image": "igapo-butterfly-drone", "clip": "touch-bridge"},
@@ -185,7 +185,7 @@ FEATURES = [
      "image": "first-boss-render", "clip": "coexistence"},
     {"category": "Craft", "title": "Painted into the engine",
      "body": "Oil paintings and ink drawings become height maps, materials, and textures. Every model is a custom asset; one level is built from María Thereza Negreiros's Amazonian canvases. Models sculpted in VR become sentient, animated actors in Unreal Engine 5.",
-     "image": "mangrove-entity"},
+     "image": "mangrove-entity", "clip": "incendio-360", "clip_caption": "Incendio Igapó 360"},
 ]
 
 # Quotes verified against sources on 2026-09-23 (GameScenes). Others carried from the Steam page.

@@ -382,7 +382,9 @@ def clip_media(n, label, ar="2x1"):
             + f'<source src="assets/3d/clips/{n}.mp4" type="video/mp4"></video></div>')
 
 def feature_card(f):
-    m = clip_media(f["clip"], f["title"]) if f.get("clip") else media(f["image"], ar="2x1")
+    m = clip_media(f["clip"], f.get("clip_caption") or f["title"]) if f.get("clip") else media(f["image"], ar="2x1")
+    if f.get("clip_caption"):
+        m += f'<p class="t-meta card__cap">{acc(e(f["clip_caption"]))}</p>'
     return (f'<article class="card">{m}'
             f'{meta(f["category"])}<h3 class="t-h3">{e(f["title"])}</h3>'
             f'<p class="t-small">{e(f["body"])}</p></article>')

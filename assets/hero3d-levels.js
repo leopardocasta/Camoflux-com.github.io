@@ -186,7 +186,7 @@
     const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
     const wide = w > 900, n = icons.length;
-    if (figure) { if (C.figure.lie) figure.position.set(wide ? 2.4 : 0.2, -1.25, -2.6); else figure.position.set(wide ? 4.7 : 2.0, -1.4, wide ? 0.4 : 0.3); }
+    if (figure) { if (C.figure.lie) figure.position.set(wide ? 2.4 : 0.2, -1.25, -2.6); else figure.position.set(wide ? 5.5 : 2.4, -1.4, wide ? 0.4 : 0.3); }
     icons.forEach((ic, i) => {
       const k = n > 1 ? i / (n - 1) : 0.5;
       ic.userData.base.set(wide ? 0.6 + k * 4.2 : -1.6 + k * 3.2, wide ? 0.5 + Math.sin(k * Math.PI) * 0.6 : 1.4, wide ? -1.2 + Math.sin(k * Math.PI) * 1.4 : 0);

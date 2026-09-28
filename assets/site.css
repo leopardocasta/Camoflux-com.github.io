@@ -421,6 +421,7 @@ a.row:hover .t-h3 { color: var(--c-accent); }
 .clip-wrap::before { display: none; }
 .clip-fig figcaption, .wide-fig figcaption { margin-top: var(--s-2); }
 .wide-fig { margin-top: var(--s-5); }
+.card__cap { margin: calc(var(--s-2) * -1) 0 var(--s-2); color: var(--c-text-3); }
 .coverage { margin-top: var(--s-6); }
 .coverage .t-meta { margin-bottom: var(--s-3); }
 .coverage__list { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); }
