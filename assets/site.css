@@ -470,3 +470,23 @@ a.row:hover .t-h3 { color: var(--c-accent); }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
   .seq > * { opacity: 1; transform: none; }
 }
+
+/* ---- Sign-up bar: fixed to the bottom from the first view ---- */
+.signup-bar { position: fixed; z-index: 90; left: 0; right: 0; bottom: 0; padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(0, 0, 0, 0.92); backdrop-filter: blur(8px); border-top: 1px solid var(--c-line); transition: transform var(--dur-base) var(--ease-out); }
+.signup-bar[hidden] { display: block; transform: translateY(110%); pointer-events: none; }
+.signup-bar__inner { max-width: var(--wrap, 1280px); margin: 0 auto; padding: var(--s-3) var(--gutter); display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+.signup-bar__text { font-size: var(--t-small); color: var(--c-text); margin-right: auto; }
+.newsletter--bar { display: flex; gap: var(--s-2); }
+.newsletter--bar input { width: 260px; padding: var(--s-2) var(--s-3); font-size: var(--t-small); }
+.signup-bar .form-msg:empty { display: none; }
+.signup-bar__close { font-size: 20px; line-height: 1; color: var(--c-text-3); padding: var(--s-1, 4px) var(--s-2); }
+.signup-bar__close:hover { color: var(--c-text); }
+.signup-bar { transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-slow) var(--ease-out); }
+.signup-bar.is-away { opacity: 0; transform: translateY(16px); pointer-events: none; }
+/* no page padding needed: the bar fades away when the footer arrives */
+@media (max-width: 720px) {
+  .signup-bar__inner { gap: var(--s-2); padding: var(--s-2) var(--s-4); }
+  .signup-bar__text { flex-basis: calc(100% - 40px); }
+  .newsletter--bar { flex: 1; } .newsletter--bar input { width: auto; flex: 1; min-width: 0; }
+}

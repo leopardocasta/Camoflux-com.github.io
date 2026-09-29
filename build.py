@@ -155,15 +155,36 @@ def header(page):
   <button class="menu-toggle" aria-expanded="false" aria-label="Open menu">{ICON["menu"]}</button>
 </header>'''
 
+def signup_bar():
+    """Slim sign-up bar fixed to the bottom of the screen on every page; visitors can close it."""
+    mc = SITE.get("mailchimp")
+    if not mc or not mc.get("action"):
+        return ""
+    return f'''<aside class="signup-bar" id="signup-bar" aria-label="Sign up">
+  <div class="signup-bar__inner">
+    <p class="signup-bar__text">{e(SITE.get("signup_text", "Sign up for studio updates."))}</p>
+    <form class="newsletter newsletter--bar" action="{e(mc["action"])}" method="post" target="_blank" novalidate data-mailchimp>
+      <label class="sr-only" for="mce-EMAIL-bar">Email address</label>
+      <input id="mce-EMAIL-bar" type="email" name="EMAIL" required placeholder="Email address" autocomplete="email">
+      <input type="hidden" name="tags" value="{e(mc["tags"])}">
+      <div class="sr-only" aria-hidden="true"><input type="text" name="{e(mc["honeypot"])}" tabindex="-1" value=""></div>
+      <button class="btn btn--primary btn--sm" type="submit">Sign up</button>
+    </form>
+    <p class="form-msg t-small" role="status" aria-live="polite"></p>
+    <button class="signup-bar__close" type="button" aria-label="Close sign-up bar">×</button>
+  </div>
+</aside>'''
+
 def footer_signup():
+    """The footer's own sign-up form, shown once the visitor reaches the bottom of the page."""
     mc = SITE.get("mailchimp")
     if not mc or not mc.get("action"):
         return ""
     return f'''<div class="footer-signup">
     <p class="t-meta">Studio updates by email</p>
     <form class="newsletter newsletter--sm" action="{e(mc["action"])}" method="post" target="_blank" novalidate data-mailchimp>
-      <label class="sr-only" for="mce-EMAIL">Email address</label>
-      <input id="mce-EMAIL" type="email" name="EMAIL" required placeholder="Email address" autocomplete="email">
+      <label class="sr-only" for="mce-EMAIL-footer">Email address</label>
+      <input id="mce-EMAIL-footer" type="email" name="EMAIL" required placeholder="Email address" autocomplete="email">
       <input type="hidden" name="tags" value="{e(mc["tags"])}">
       <div class="sr-only" aria-hidden="true"><input type="text" name="{e(mc["honeypot"])}" tabindex="-1" value=""></div>
       <button class="btn btn--primary btn--sm" type="submit">Subscribe</button>
@@ -269,6 +290,7 @@ def page_shell(page, title, body, description=None, preload=None, modal=False):
 {body}
 </main>
 {footer()}
+{signup_bar()}
 <div class="shotbox" id="lightbox" data-open="false" role="dialog" aria-modal="true" aria-label="Image">
   <div class="shotbox__frame"><button class="shotbox__close btn btn--ghost btn--sm">Close</button><div class="shotbox__stage"></div><p class="shotbox__cap t-meta"></p></div>
 </div>
@@ -541,7 +563,8 @@ def build_exhibitions():
     for w in f["works"]:
         text = (f'<div class="stack">{meta(w["year"], "p")}<h3 class="t-h2">{e(w["title"])}</h3>'
                 f'{meta(w["media"], "p")}{prose([e(w["body"])])}'
-                + (f'<p class="t-small">{e(w["credits"])}</p>' if w.get("credits") else "") + "</div>")
+                + (f'<p class="t-small">{e(w["credits"])}</p>' if w.get("credits") else "")
+                + (link(w["url"], w.get("link_label", "Visit")) if w.get("url") else "") + "</div>")
         if w.get("image"):
             works += f'<article class="work">{media(w["image"], size="main")}{text}</article>'
         else:

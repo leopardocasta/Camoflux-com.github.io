@@ -31,6 +31,23 @@
     media.forEach(loadMedia);
   }
 
+  /* ---- Sign-up bar: shown from the start; closing it is remembered on this device ---- */
+  const bar = document.getElementById('signup-bar');
+  if (bar) {
+    let dismissed = false;
+    try { dismissed = localStorage.getItem('camoflux-signup-closed') === '1'; } catch (e) {}
+    if (dismissed) bar.hidden = true; else document.body.classList.add('has-signup-bar');
+    // Fade the bar away once the footer (with its own sign-up form) comes into view.
+    const foot = document.querySelector('.site-footer');
+    if (foot && 'IntersectionObserver' in window) {
+      new IntersectionObserver((es) => { bar.classList.toggle('is-away', es[0].isIntersecting); }, { threshold: 0.05 }).observe(foot);
+    }
+    bar.querySelector('.signup-bar__close').addEventListener('click', () => {
+      bar.hidden = true; document.body.classList.remove('has-signup-bar');
+      try { localStorage.setItem('camoflux-signup-closed', '1'); } catch (e) {}
+    });
+  }
+
   /* ---- Lightbox: every image opens large on click (or Enter), except inside links ---- */
   const lb = document.getElementById('lightbox');
   if (lb) {
